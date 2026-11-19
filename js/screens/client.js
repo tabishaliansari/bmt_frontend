@@ -4,7 +4,7 @@ BMT.screens = BMT.screens || {};
 
 (function () {
   const { api, ui } = BMT;
-  const { C, icon, seal, yt, logo, av, thumb, playBadge, chip, rating, tagChip, inr, tabbar, toast, sheet } = ui;
+  const { C, icon, seal, yt, logo, av, thumb, playBadge, chip, rating, tagChip, inr, esc, tabbar, toast, sheet } = ui;
   const S = BMT.screens;
   BMT.cart = BMT.cart || null; // { editorId, itemId, addons:[], rush:false }
 
@@ -71,6 +71,20 @@ BMT.screens = BMT.screens || {};
       });
     });
   }
+  S.editorCard = editorCard;
+  S.wireEditorCards = wireEditorCards;
+
+  // The package on this storefront that best fits the client's brief, or null.
+  function briefMatch(e, brief) {
+    if (!brief) return null;
+    const words = new Set(brief.packageTitle.toLowerCase().split(/\W+/).filter((w) => w.length > 2));
+    const scored = e.menu
+      .filter((m) => m.tag !== "try")
+      .map((m) => ({ m, score: m.title.toLowerCase().split(/\W+/).filter((w) => words.has(w)).length }))
+      .sort((a, b) => b.score - a.score);
+    if (scored[0]?.score > 0) return scored[0].m.id;
+    return e.categories.includes(brief.category) ? e.menu.find((m) => m.tag === "best")?.id || null : null;
+  }
 
   // ---------------------------------------------------------------- 02 Discover
   S.discover = async (_, query) => {
@@ -89,6 +103,11 @@ BMT.screens = BMT.screens || {};
           <div class="row gap-12"><button class="icon-btn" id="bell" aria-label="Notifications">${icon("bell", 21)}</button><a href="#/you">${av("TA", 1, 36)}</a></div>
         </div>
         <a href="#/search" class="field" style="margin-top:12px;text-decoration:none">${icon("search", 18, C.tab)}<span style="color:${C.tab};flex:1">Editors, styles, “podcast clips”</span>${icon("filter", 18, C.tab)}</a>
+        <a href="#/start" class="card-ink pressable start-hero" id="start-hero">
+          <div class="icon-tile">${icon("sparkle", 22, C.cut, 2)}</div>
+          <div class="flex-1"><div style="font-size:17px;font-weight:600">Start with your footage</div><div style="font-size:13px;opacity:.7;margin-top:2px">Gemini writes the brief</div></div>
+          ${icon("chev_r", 18, "currentColor", 2.2)}
+        </a>
         <h2 class="h2" style="margin-top:22px">What are you making?</h2>
         <div class="hscroll cats" style="gap:6px">${cats.map((c) => `
           <a href="#/discover${cat === c.id ? "" : "?cat=" + c.id}" style="display:flex;flex-direction:column;align-items:center;gap:7px;width:64px;flex-shrink:0;text-decoration:none">
@@ -153,10 +172,10 @@ BMT.screens = BMT.screens || {};
   };
 
   // ---------------------------------------------------------------- 03 Editor storefront
-  const menuItem = (m, added) => `
+  const menuItem = (m, added, matched) => `
     <div class="menu-item">
       <div class="flex-1">
-        ${m.tag ? `<div style="margin-bottom:6px">${tagChip(m.tag)}</div>` : ""}
+        ${matched || m.tag ? `<div class="row gap-4" style="margin-bottom:6px;flex-wrap:wrap">${matched ? chip("Matches your brief", "best", icon("sparkle", 11, C.cut, 2.2)) : ""}${tagChip(m.tag)}</div>` : ""}
         <div class="h3">${m.title}</div>
         <div class="row gap-8" style="margin-top:4px"><span style="font-size:15px;font-weight:600">${inr(m.price)}</span><span style="color:var(--ter)">·</span><span class="row gap-4 foot">${icon("clock", 13, C.sub)}${m.eta}</span></div>
         <div class="foot" style="margin-top:6px">${m.desc}</div>
@@ -174,9 +193,15 @@ BMT.screens = BMT.screens || {};
     if (!e) return S.notFound();
     let tab = query.get("tab") || "menu";
     const isFav = api.getFavorites().includes(e.id);
+    const brief = api.getActiveBrief();
+    const matchId = briefMatch(e, brief);
+    const briefBanner = () => brief ? `
+      <div class="card-gray row gap-10" style="margin-top:14px;grid-column:1 / -1">${icon("sparkle", 18, C.cut, 2)}
+        <div class="flex-1"><div style="font-size:15px;font-weight:600">Ordering for your brief</div><div class="foot">${esc(brief.title)} · attached to your order</div></div>
+        <button class="link" id="drop-brief" style="font-size:15px">Remove</button></div>` : "";
 
     const tabContent = (t) => {
-      if (t === "menu") return e.menu.map((m) => menuItem(m, BMT.cart && BMT.cart.editorId === e.id && BMT.cart.itemId === m.id)).join("");
+      if (t === "menu") return briefBanner() + e.menu.map((m) => menuItem(m, BMT.cart && BMT.cart.editorId === e.id && BMT.cart.itemId === m.id, m.id === matchId)).join("");
       if (t === "work") return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-top:14px">${e.work.map((g) => thumb(g, "100%", 160, 6, `<div style="position:absolute;left:6px;bottom:6px;color:#fff;font-size:11px;font-weight:600" class="row gap-4">${icon("play", 10, "#fff")}${(Math.random() * 900 + 50).toFixed(0)}K</div>`, "cursor:pointer")).join("")}</div>`;
       if (t === "reviews") return `
         <div class="row gap-12" style="margin-top:16px"><div class="rounded-num" style="font-size:44px">${e.rating}</div><div><div class="row">${starRow(Math.round(e.rating))}</div><div class="foot">${e.ratingCount} reviews · only from paid orders</div></div></div>
@@ -242,6 +267,8 @@ BMT.screens = BMT.screens || {};
         };
         const renderAll = () => { if (tab === "menu") setTab("menu"); renderCart(); };
         function wireMenu() {
+          const drop = root.querySelector("#drop-brief");
+          drop && drop.addEventListener("click", () => { api.clearActiveBrief(); toast("Brief removed from this order"); BMT.router.refresh(); });
           root.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => {
             const itemId = b.dataset.add;
             if (!BMT.cart || BMT.cart.editorId !== e.id || BMT.cart.itemId !== itemId) BMT.cart = { editorId: e.id, itemId, addons: [], rush: false };
@@ -294,6 +321,18 @@ BMT.screens = BMT.screens || {};
     const files = [];
     const totalHTML = () => inr(api.quote(e.id, itemId, cart));
     const eta = item.eta;
+    const brief = api.getActiveBrief();
+    const footage = brief
+      ? `<div class="h3" style="margin-top:20px">Your brief</div>
+        <div class="card-gray row gap-10" style="margin-top:10px">${icon("sparkle", 18, C.cut, 2)}
+          <div class="flex-1"><div style="font-size:15px;font-weight:600">${esc(brief.title)}</div><div class="cap">Written by Gemini from your clips · attached to this order</div></div>
+          <a class="link" href="#/brief/${esc(brief.id)}" data-close style="font-size:15px">View</a></div>`
+      : `<div class="h3" style="margin-top:20px">Your footage</div>
+        <label class="dropzone" style="margin-top:10px">
+          <div class="icon-tile" style="width:36px;height:36px;background:var(--cut-tint)">${icon("upload", 18, C.cut, 2)}</div>
+          <div class="flex-1" id="file-label"><div style="font-size:15px;font-weight:600">Add clips or paste a Drive link</div><div class="cap">Uploads continue in the background</div></div>
+          <input type="file" id="files" multiple accept="video/*" style="display:none">
+        </label>`;
 
     sheet({
       height: "92%",
@@ -316,12 +355,7 @@ BMT.screens = BMT.screens || {};
             <span style="font-size:15px;color:var(--ink2);margin-right:8px">+${inr(a.price)}</span>
             <span class="check ${cart.addons.includes(a.id) ? "on" : ""}">${cart.addons.includes(a.id) ? icon("check", 15, "#fff", 3) : ""}</span>
           </button>`).join("")}
-        <div class="h3" style="margin-top:20px">Your footage</div>
-        <label class="dropzone" style="margin-top:10px">
-          <div class="icon-tile" style="width:36px;height:36px;background:var(--cut-tint)">${icon("upload", 18, C.cut, 2)}</div>
-          <div class="flex-1" id="file-label"><div style="font-size:15px;font-weight:600">Add clips or paste a Drive link</div><div class="cap">Uploads continue in the background</div></div>
-          <input type="file" id="files" multiple accept="video/*" style="display:none">
-        </label>
+        ${footage}
         <div class="h3" style="margin-top:20px">Notes for ${e.name.split(" ")[0]}</div>
         <textarea class="note" id="note" placeholder="Vibe, references, must-have moments…" style="margin-top:10px"></textarea>
         <button id="protect" style="margin-top:14px;width:100%;text-align:left;border-radius:14px;background:var(--safe-tint);padding:12px;display:flex;gap:10px;align-items:flex-start">
@@ -348,7 +382,7 @@ BMT.screens = BMT.screens || {};
           box.classList.toggle("on", on); box.innerHTML = on ? icon("check", 15, "#fff", 3) : "";
           refresh();
         }));
-        el.querySelector("#files").addEventListener("change", (ev) => {
+        el.querySelector("#files")?.addEventListener("change", (ev) => {
           const list = [...ev.target.files];
           files.splice(0, files.length, ...list.map((f) => ({ name: f.name, size: f.size })));
           if (!list.length) return;
@@ -357,12 +391,19 @@ BMT.screens = BMT.screens || {};
         });
         el.querySelector("#protect").addEventListener("click", escrowSheet);
         el.querySelector("#place").addEventListener("click", async (ev) => {
-          ev.currentTarget.disabled = true; ev.currentTarget.textContent = "Placing order…";
-          const order = await api.placeOrder({ editorId: e.id, itemId, addons: cart.addons, rush: cart.rush, note: el.querySelector("#note").value, files });
-          BMT.cart = null;
-          close();
-          toast("Order placed · money held safely", icon("lock", 16, "#4ADE80", 2));
-          location.hash = "#/order/" + order.id;
+          const btn = ev.currentTarget;
+          btn.disabled = true; btn.textContent = "Placing order…";
+          try {
+            const order = await api.placeOrder({ editorId: e.id, itemId, addons: cart.addons, rush: cart.rush, note: el.querySelector("#note").value, briefId: brief?.id || null });
+            BMT.cart = null;
+            if (brief) api.clearActiveBrief();
+            close();
+            toast("Order placed · money held safely", icon("lock", 16, C.safe, 2));
+            location.hash = "#/order/" + order.id;
+          } catch (err) {
+            btn.disabled = false; btn.textContent = "Place order";
+            toast(esc(err.message));
+          }
         });
       },
     });
@@ -383,7 +424,7 @@ BMT.screens = BMT.screens || {};
     const orders = await api.getOrders();
     const editors = await api.getEditors();
     const name = (id) => editors.find((x) => x.id === id)?.name || id;
-    const label = { editing: ["Editing", C.cut], review: ["Ready to review", C.trust], approved: ["Completed", C.safe] };
+    const label = { editing: ["Editing", C.cut], review: ["Ready to review", C.trust], approved: ["Completed", C.safe], refunded: ["Refunded", C.sub] };
     return {
       tabs: tabbar("client", "orders"),
       html: `<div class="scroll">

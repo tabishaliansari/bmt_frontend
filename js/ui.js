@@ -86,6 +86,18 @@ window.BMT = window.BMT || {};
   const tagChip = (tag) => tag === "best" ? chip("Bestseller", "best", icon("bolt", 11, C.cut, 2.2)) : tag === "try" ? chip("Try first", "try") : "";
 
   const inr = (n) => "₹" + Number(n).toLocaleString("en-IN");
+  const usd = (n) => "US$" + Number(n).toFixed(2);
+  // Escape text from users or Gemini before it goes into innerHTML.
+  const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ESC[c]);
+  // Calm, honest progress line for AI steps: cycles through messages, no fake percentages.
+  function aiProgress(el, lines, ms = 2600) {
+    let i = 0;
+    const paint = () => (el.innerHTML = `<div class="ai-wait"><span class="ai-dot"></span><span>${lines[i % lines.length]}</span></div>`);
+    paint();
+    const t = setInterval(() => { i++; paint(); }, ms);
+    return () => clearInterval(t);
+  }
   const compact = (n) => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, "") + "K" : String(n);
 
   const TABS = {
@@ -185,5 +197,5 @@ window.BMT = window.BMT || {};
 
   const isDesktop = () => document.body.classList.contains("L-desk");
 
-  BMT.ui = { C, G, icon, seal, yt, logo, av, thumb, playBadge, chip, rating, tagChip, inr, compact, tabbar, sidebar, toast, sheet, onLongPress, peek, statusBar, isDesktop };
+  BMT.ui = { C, G, icon, seal, yt, logo, av, thumb, playBadge, chip, rating, tagChip, inr, usd, esc, aiProgress, compact, tabbar, sidebar, toast, sheet, onLongPress, peek, statusBar, isDesktop };
 })();

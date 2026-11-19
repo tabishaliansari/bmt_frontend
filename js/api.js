@@ -1,14 +1,11 @@
 /*
- * BMT API layer.
- * Every screen talks ONLY to BMT.api. Today it serves mock data from memory
- * (+ localStorage for orders). To plug in the real backend, replace the body
- * of each function with a fetch() to your server. Keep the same return shapes.
+ * BMT API layer. Every screen talks ONLY to BMT.api.
  *
- *   Example:
- *   async getEditors(params) {
- *     const r = await fetch(`${API_BASE}/editors?` + new URLSearchParams(params));
- *     return r.json();
- *   }
+ * Live mode (default): calls the FastAPI backend under /api/v1 (docs/API.md) and converts
+ * its snake_case JSON into the shapes the screens use (toEditor, toOrder, toAddon).
+ * Mock mode (?mocks=1 in the URL): the same functions served from in-memory data and
+ * localStorage, with canned Gemini results. This is the demo fallback.
+ * Categories, quick packages, courses, posts and the editor studio are mock in both modes.
  */
 window.BMT = window.BMT || {};
 
@@ -20,16 +17,43 @@ window.BMT = window.BMT || {};
   const wait = (v) => new Promise((res) => setTimeout(() => res(structuredClone(v)), LATENCY));
 
   // ---------------------------------------------------------------- backend
+  function apiError(status, body) {
+    const err = new Error(body?.error?.message || `Something went wrong (${status}). Please try again.`);
+    err.status = status;
+    err.code = body?.error?.code;
+    return err;
+  }
+
   async function http(path, options) {
-    const r = await fetch(API_BASE + path, options);
-    const body = await r.json().catch(() => null);
-    if (!r.ok) {
-      const err = new Error(body?.error?.message || `Request failed (${r.status})`);
-      err.status = r.status;
-      err.code = body?.error?.code;
-      throw err;
+    let r;
+    try {
+      r = await fetch(API_BASE + path, options);
+    } catch {
+      throw new Error("Can't reach BMT. Check your connection and try again.");
     }
+    const body = await r.json().catch(() => null);
+    if (!r.ok) throw apiError(r.status, body);
     return body;
+  }
+
+  /** Multipart upload through XHR, because fetch() can't report upload progress. */
+  function uploadXHR(file, kind, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", API_BASE + "/uploads");
+      xhr.upload.onprogress = (ev) => ev.lengthComputable && onProgress && onProgress(ev.loaded / ev.total);
+      xhr.onload = () => {
+        let body = null;
+        try { body = JSON.parse(xhr.responseText); } catch {}
+        if (xhr.status >= 200 && xhr.status < 300) resolve(body);
+        else reject(apiError(xhr.status, body));
+      };
+      xhr.onerror = () => reject(new Error("Upload failed. Check your connection and try again."));
+      const form = new FormData();
+      form.append("file", file);
+      form.append("kind", kind);
+      xhr.send(form);
+    });
   }
 
   const fmtEta = (hours) => (hours <= 48 ? `${hours}h` : `${Math.round(hours / 24)} days`);
@@ -45,6 +69,24 @@ window.BMT = window.BMT || {};
     rating: e.rating, ratingCount: e.rating_count, credits: e.credits, channels: e.channels,
     views: e.views, onTime: e.on_time, reply: e.reply, from: e.from_inr, days: e.days,
     menu: e.packages.map(toPackage), creditList: e.credit_list, reviews: e.reviews, work: e.work,
+  });
+  const toAddon = (a) => ({ id: a.id, icon: a.icon, title: a.title, sub: a.sub, price: a.price_inr, priceUsd: a.price_usd });
+
+  // Server statuses → the three the screens know. funded and in_progress both mean "being edited".
+  const STATUS = { funded: "editing", in_progress: "editing", review: "review", approved: "approved", refunded: "refunded" };
+  const eventTime = (o, status) => {
+    const ev = [...o.timeline].reverse().find((t) => t.status === status);
+    return ev ? Date.parse(ev.at) : null;
+  };
+  const toOrder = (o) => ({
+    id: o.id, editorId: o.editor_id, itemId: o.package_id, title: o.title, g: o.g,
+    addons: o.addons, rush: o.rush, note: o.note,
+    total: o.total_inr, totalUsd: o.total_usd,
+    placedAt: Date.parse(o.created_at), dueAt: Date.parse(o.due_at),
+    status: STATUS[o.status], serverStatus: o.status, revisionsLeft: o.revisions_left,
+    notes: o.client_notes.map((n) => ({ t: n.t, who: "you", text: n.text })),
+    briefId: o.brief_id, brief: o.brief, review: o.review, payout: o.payout, cutUploadId: o.cut_upload_id,
+    deliveredAt: eventTime(o, "review"), approvedAt: eventTime(o, "approved"),
   });
 
   // ---------------------------------------------------------------- mock data
@@ -196,104 +238,59 @@ window.BMT = window.BMT || {};
     course: { title: "Retention Editing 101", sold: 12, revenue: 17988 },
   };
 
-  // ---------------------------------------------------------------- persistence
+  // ---------------------------------------------------------------- mock AI results (?mocks=1 demo fallback)
+  const MOCK_BRIEF = {
+    title: "Cafe launch reel", format: "reel", target_length_sec: 30,
+    hook_idea: "Open on the first pour in slow motion, cut on the beat",
+    best_moments: [
+      { upload_id: "", start: "00:04", end: "00:09", why: "Latte art close-up, strong hook" },
+      { upload_id: "", start: "00:15", end: "00:19", why: "Customers laughing at the counter, warm and real" },
+    ],
+    style_notes: "Warm grade, quick cuts on the beat, bold captions.",
+    must_include: ["Cafe name", "Opening date", "Location"],
+    questions_for_client: ["Do you have a logo file?"],
+    recommended_package: { category: "reels", package_title: "Instagram Reel", reason: "Under 60s, captions, fast turnaround" },
+  };
+  const MOCK_REVIEW = {
+    overall_match: 82, summary: "Hook and pacing match the brief; captions missing in the middle section.",
+    checklist: [{ item: "Under 30 seconds", met: true }, { item: "Opens on the pour", met: true }, { item: "Cafe name on screen", met: false }, { item: "Captions throughout", met: false }],
+    notes: [
+      { timestamp_sec: 12, issue: "Captions disappear", suggestion: "Keep captions through 0:12–0:18", severity: "high", source: "ai" },
+      { timestamp_sec: 24, issue: "Cafe name never shown", suggestion: "Add the cafe name as a title over the closing shot", severity: "medium", source: "ai" },
+    ],
+  };
+  const MOCK_FX = 84.1, MOCK_FEE = 0.15;
+
+  // ---------------------------------------------------------------- persistence (this browser only)
   const store = {
     get(k, d) { try { const v = localStorage.getItem("bmt:" + k); return v ? JSON.parse(v) : d; } catch { return d; } },
     set(k, v) { try { localStorage.setItem("bmt:" + k, JSON.stringify(v)); } catch {} },
   };
 
+  // Prices shown in the UI. The server re-prices every order, so this is display only.
+  const cache = { editors: {}, addons: null };
+  const findEditor = (id) => cache.editors[id] || editors.find((e) => e.id === id);
   const priceOf = (editorId, itemId, opts = {}) => {
-    const ed = editors.find((e) => e.id === editorId);
-    const item = ed.menu.find((m) => m.id === itemId);
-    const add = (opts.addons || []).reduce((s, id) => s + (addons.find((a) => a.id === id)?.price || 0), 0);
-    return item.price + add + (opts.rush ? RUSH_FEE : 0);
+    const item = findEditor(editorId).menu.find((m) => m.id === itemId);
+    const list = cache.addons || addons;
+    const add = (opts.addons || []).reduce((s, id) => s + (list.find((a) => a.id === id)?.price || 0), 0);
+    return item.price + add + (opts.rush ? BMT.api.RUSH_FEE : 0);
   };
 
-  // ---------------------------------------------------------------- public API
-  BMT.api = {
+  // ---------------------------------------------------------------- shared (same in both modes)
+  const shared = {
     API_BASE,
     BMT_USE_MOCKS,
     RUSH_FEE,
 
     getCategories: () => wait(categories),
     getQuickPackages: () => wait(quickPackages),
-    getAddons: () => wait(addons),
-
-    /** GET /editors?category=&q= */
-    async getEditors({ category, q } = {}) {
-      if (!BMT_USE_MOCKS) {
-        const params = new URLSearchParams();
-        if (category) params.set("category", category);
-        if (q) params.set("q", q);
-        return (await http(`/editors?${params}`)).map(toEditor);
-      }
-      let list = editors;
-      if (category) list = list.filter((e) => e.categories.includes(category));
-      if (q) {
-        const s = q.toLowerCase();
-        list = list.filter((e) => [e.name, e.handle, e.city, ...e.styles, ...e.menu.map((m) => m.title)].join(" ").toLowerCase().includes(s));
-      }
-      return wait(list);
-    },
-
-    /** GET /editors/:id */
-    async getEditor(id) {
-      if (BMT_USE_MOCKS) return wait(editors.find((e) => e.id === id) || null);
-      try {
-        return toEditor(await http(`/editors/${encodeURIComponent(id)}`));
-      } catch (err) {
-        if (err.status === 404) return null;
-        throw err;
-      }
-    },
-
     quote: (editorId, itemId, opts) => priceOf(editorId, itemId, opts),
 
-    /** POST /orders  → funds held in escrow until approval */
-    async placeOrder({ editorId, itemId, addons: ad = [], rush = false, note = "", files = [] }) {
-      const ed = editors.find((e) => e.id === editorId);
-      const item = ed.menu.find((m) => m.id === itemId);
-      const orders = store.get("orders", []);
-      const id = "BMT-" + (2481 + orders.length);
-      const hours = rush ? 24 : item.eta.includes("h") ? parseInt(item.eta) : parseInt(item.eta) * 24;
-      const order = {
-        id, editorId, itemId, title: item.title, g: item.g, addons: ad, rush, note, files,
-        total: priceOf(editorId, itemId, { addons: ad, rush }),
-        placedAt: Date.now(), dueAt: Date.now() + Math.min(hours, 14) * 3600e3,
-        status: "editing", // editing → review → approved
-        revisionsLeft: ad.includes("revision") ? 3 : 2,
-        notes: [],
-      };
-      orders.unshift(order);
-      store.set("orders", orders);
-      return wait(order);
-    },
-
-    getOrders: () => wait(store.get("orders", [])),
-    getOrder: (id) => wait(store.get("orders", []).find((o) => o.id === id) || null),
-
-    async updateOrder(id, patch) {
-      const orders = store.get("orders", []);
-      const i = orders.findIndex((o) => o.id === id);
-      if (i < 0) return null;
-      orders[i] = { ...orders[i], ...patch };
-      store.set("orders", orders);
-      return wait(orders[i]);
-    },
-
-    /** POST /orders/:id/approve → releases escrow to editor */
-    approveOrder: (id) => BMT.api.updateOrder(id, { status: "approved", approvedAt: Date.now() }),
-
-    /** POST /orders/:id/revisions */
-    async requestChanges(id) {
-      const o = await BMT.api.getOrder(id);
-      return BMT.api.updateOrder(id, { status: "editing", revisionsLeft: Math.max(0, o.revisionsLeft - 1), dueAt: Date.now() + 12 * 3600e3 });
-    },
-
-    async addNote(id, note) {
-      const o = await BMT.api.getOrder(id);
-      return BMT.api.updateOrder(id, { notes: [...o.notes, note] });
-    },
+    /** The brief the client is ordering for: { id, title, category, packageTitle } */
+    getActiveBrief: () => store.get("brief", null),
+    setActiveBrief: (b) => store.set("brief", { id: b.id, title: b.result.title, category: b.result.recommended_package.category, packageTitle: b.result.recommended_package.package_title }),
+    clearActiveBrief: () => { try { localStorage.removeItem("bmt:brief"); } catch {} },
 
     /** POST /credits/lookup  (server calls YouTube Data API) */
     async lookupVideo(url) {
@@ -321,6 +318,160 @@ window.BMT = window.BMT || {};
 
     getMode: () => store.get("mode", null),
     setMode: (m) => store.set("mode", m),
-    resetDemo() { ["orders", "favs", "accepting", "incomingHandled", "mode"].forEach((k) => { try { localStorage.removeItem("bmt:" + k); } catch {} }); },
+    resetDemo() { ["orders", "briefs", "brief", "favs", "accepting", "incomingHandled", "mode"].forEach((k) => { try { localStorage.removeItem("bmt:" + k); } catch {} }); },
   };
+
+  // ---------------------------------------------------------------- live backend (/api/v1)
+  const enc = encodeURIComponent;
+  const json = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) });
+  const orNull = async (promise) => {
+    try { return await promise; } catch (err) { if (err.status === 404) return null; throw err; }
+  };
+  const remember = (list) => (list.forEach((e) => (cache.editors[e.id] = e)), list);
+
+  const live = {
+    async getAddons() {
+      const c = await http("/addons");
+      cache.addons = c.addons.map(toAddon);
+      BMT.api.RUSH_FEE = c.rush_fee_inr;
+      return cache.addons;
+    },
+
+    /** GET /editors?category=&q= */
+    async getEditors({ category, q } = {}) {
+      const params = new URLSearchParams();
+      if (category) params.set("category", category);
+      if (q) params.set("q", q);
+      return remember((await http(`/editors?${params}`)).map(toEditor));
+    },
+    /** GET /editors/:id */
+    async getEditor(id) {
+      const e = await orNull(http(`/editors/${enc(id)}`));
+      return e ? remember([toEditor(e)])[0] : null;
+    },
+    /** GET /editors/recommended?brief_id= */
+    getRecommendedEditors: async (briefId) => remember((await http(`/editors/recommended?brief_id=${enc(briefId)}`)).map(toEditor)),
+
+    /** POST /orders → funds held safely until approval. The server sets the price. */
+    async placeOrder({ editorId, itemId, addons: ad = [], rush = false, note = "", briefId = null }) {
+      return toOrder(await http("/orders", json("POST", { editor_id: editorId, package_id: itemId, addons: ad, rush, note, brief_id: briefId })));
+    },
+    getOrders: async () => (await http("/orders")).map(toOrder),
+    getOrder: async (id) => { const o = await orNull(http(`/orders/${enc(id)}`)); return o && toOrder(o); },
+    deliverCut: async (id, cutUploadId) => toOrder(await http(`/orders/${enc(id)}/deliver`, json("POST", { cut_upload_id: cutUploadId }))),
+    addNote: async (id, n) => toOrder(await http(`/orders/${enc(id)}/notes`, json("POST", { t: n.t, text: n.text }))),
+    requestChanges: async (id) => toOrder(await http(`/orders/${enc(id)}/revisions`, json("POST"))),
+    approveOrder: async (id) => toOrder(await http(`/orders/${enc(id)}/approve`, json("POST"))),
+    /** POST /orders/:id/review → Review Copilot. With feedback, it is rewritten into notes. */
+    runReview: (id, feedback) => http(`/orders/${enc(id)}/review`, json("POST", feedback ? { client_feedback: feedback } : {})),
+
+    /** POST /uploads (multipart) with upload progress 0..1 */
+    uploadFile: uploadXHR,
+    mediaUrl: (uploadId) => `${API_BASE}/uploads/${enc(uploadId)}/content`,
+
+    /** Briefs keep the backend shape: { id, upload_ids, client_note, result } */
+    createBrief: ({ uploadIds, note }) => http("/briefs", json("POST", { upload_ids: uploadIds, client_note: note || "" })),
+    getBrief: (id) => orNull(http(`/briefs/${enc(id)}`)),
+    updateBrief: (id, result) => http(`/briefs/${enc(id)}`, json("PUT", { result })),
+  };
+
+  // ---------------------------------------------------------------- mock backend (localStorage)
+  const mediaUrls = {};
+  const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+  async function patchOrder(id, patch) {
+    const orders = store.get("orders", []);
+    const i = orders.findIndex((o) => o.id === id);
+    if (i < 0) return null;
+    orders[i] = { ...orders[i], ...patch };
+    store.set("orders", orders);
+    return wait(orders[i]);
+  }
+
+  const mock = {
+    getAddons: () => wait(addons),
+    async getEditors({ category, q } = {}) {
+      let list = editors;
+      if (category) list = list.filter((e) => e.categories.includes(category));
+      if (q) {
+        const s = q.toLowerCase();
+        list = list.filter((e) => [e.name, e.handle, e.city, ...e.styles, ...e.menu.map((m) => m.title)].join(" ").toLowerCase().includes(s));
+      }
+      return wait(list);
+    },
+    getEditor: (id) => wait(editors.find((e) => e.id === id) || null),
+    async getRecommendedEditors(briefId) {
+      const b = store.get("briefs", {})[briefId];
+      const cat = b?.result.recommended_package.category;
+      return wait(editors.filter((e) => !cat || e.categories.includes(cat)).sort((a, z) => z.rating - a.rating));
+    },
+
+    async placeOrder({ editorId, itemId, addons: ad = [], rush = false, note = "", briefId = null }) {
+      const item = findEditor(editorId).menu.find((m) => m.id === itemId);
+      const orders = store.get("orders", []);
+      const hours = rush ? 24 : item.eta.includes("h") ? parseInt(item.eta) : parseInt(item.eta) * 24;
+      const order = {
+        id: "BMT-" + (2481 + orders.length), editorId, itemId, title: item.title, g: item.g, addons: ad, rush, note,
+        total: priceOf(editorId, itemId, { addons: ad, rush }),
+        placedAt: Date.now(), dueAt: Date.now() + Math.min(hours, 14) * 3600e3,
+        status: "editing", revisionsLeft: ad.includes("revision") ? 3 : 2, notes: [],
+        briefId, brief: briefId ? store.get("briefs", {})[briefId]?.result || null : null,
+        review: null, payout: null, cutUploadId: null,
+      };
+      orders.unshift(order);
+      store.set("orders", orders);
+      return wait(order);
+    },
+    getOrders: () => wait(store.get("orders", [])),
+    getOrder: (id) => wait(store.get("orders", []).find((o) => o.id === id) || null),
+    deliverCut: (id, cutUploadId) => patchOrder(id, { status: "review", deliveredAt: Date.now(), cutUploadId, review: null, notes: [] }),
+    async addNote(id, note) {
+      const o = await mock.getOrder(id);
+      return patchOrder(id, { notes: [...o.notes, note].sort((a, b) => a.t - b.t) });
+    },
+    async requestChanges(id) {
+      const o = await mock.getOrder(id);
+      return patchOrder(id, { status: "editing", revisionsLeft: Math.max(0, o.revisionsLeft - 1), dueAt: Date.now() + 12 * 3600e3 });
+    },
+    async approveOrder(id) {
+      const o = await mock.getOrder(id);
+      const usd = Math.round((o.total / MOCK_FX) * (1 - MOCK_FEE) * 100) / 100;
+      const payout = { amount_usd: usd, fx_rate: MOCK_FX, amount_inr: Math.round(usd * MOCK_FX * 100) / 100, rail: "ramp", status: "simulated" };
+      return patchOrder(id, { status: "approved", approvedAt: Date.now(), payout });
+    },
+    async runReview(id, feedback) {
+      await delay(2500);
+      const o = await mock.getOrder(id);
+      let review = o.review || structuredClone(MOCK_REVIEW);
+      if (feedback) review = { ...review, notes: [...review.notes, { timestamp_sec: 3, issue: "Client: " + feedback, suggestion: "Apply this on the opening shot first, then carry it through", severity: "medium", source: "client" }].sort((a, b) => a.timestamp_sec - b.timestamp_sec) };
+      await patchOrder(id, { review });
+      return review;
+    },
+
+    async uploadFile(file, kind, onProgress) {
+      for (const p of [0.3, 0.7, 1]) { await delay(250); onProgress && onProgress(p); }
+      const id = "up_mock" + Math.random().toString(16).slice(2, 8);
+      mediaUrls[id] = URL.createObjectURL(file);
+      return { id, kind, filename: file.name, mime: file.type, size: file.size };
+    },
+    mediaUrl: (uploadId) => mediaUrls[uploadId] || null,
+
+    async createBrief({ uploadIds, note }) {
+      await delay(3000);
+      const briefs = store.get("briefs", {});
+      const id = "br_mock" + (Object.keys(briefs).length + 1);
+      const result = { ...structuredClone(MOCK_BRIEF), best_moments: MOCK_BRIEF.best_moments.map((m) => ({ ...m, upload_id: uploadIds[0] })) };
+      briefs[id] = { id, upload_ids: uploadIds, client_note: note || "", result };
+      store.set("briefs", briefs);
+      return briefs[id];
+    },
+    getBrief: (id) => wait(store.get("briefs", {})[id] || null),
+    async updateBrief(id, result) {
+      const briefs = store.get("briefs", {});
+      briefs[id] = { ...briefs[id], result };
+      store.set("briefs", briefs);
+      return wait(briefs[id]);
+    },
+  };
+
+  BMT.api = Object.assign({}, shared, BMT_USE_MOCKS ? mock : live);
 })();

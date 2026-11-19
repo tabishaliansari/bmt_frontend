@@ -8,6 +8,9 @@ window.BMT = window.BMT || {};
     [/^\/welcome$/, S.welcome],
     [/^\/discover$/, S.discover],
     [/^\/search$/, S.search],
+    [/^\/start$/, S.start],
+    [/^\/brief\/([\w-]+)$/, S.brief],
+    [/^\/brief\/([\w-]+)\/editors$/, S.briefEditors],
     [/^\/editor\/([\w-]+)$/, S.editor],
     [/^\/orders$/, S.orders],
     [/^\/order\/([\w-]+)$/, S.order],
@@ -33,7 +36,7 @@ window.BMT = window.BMT || {};
     if (/^\/(welcome)?$/.test(path) && !BMT.api.getMode()) return null; // welcome: no nav
     const mode = EDITOR_ROUTES.test(path) ? "editor" : (BMT.api.getMode() || "client");
     const map = mode === "client"
-      ? [[/^\/(discover|editor)/, "home"], [/^\/search/, "search"], [/^\/(orders|order|review)/, "orders"], [/^\/inbox/, "chat"], [/^\/(you|favs)/, "user"]]
+      ? [[/^\/(discover|editor|start|brief)/, "home"], [/^\/search/, "search"], [/^\/(orders|order|review)/, "orders"], [/^\/inbox/, "chat"], [/^\/(you|favs)/, "user"]]
       : [[/^\/studio$/, "studio"], [/^\/studio-orders/, "orders"], [/^\/community/, "users"], [/^\/learn/, "book"], [/^\/(me|add-credit|editor)/, "user"]];
     const hit = map.find(([re]) => re.test(path));
     return { mode, active: hit ? hit[1] : mode === "editor" ? "studio" : "home" };
