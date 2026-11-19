@@ -1,0 +1,92 @@
+/* BMT design tokens. Mirrors the Figma "Design Language" board. */
+:root {
+  /* Neutrals (60%) */
+  --canvas: #FFFFFF;
+  --grouped: #F2F2F7;
+  --line: #E5E5EA;
+  --page: #E8E8ED;          /* behind the phone frame */
+  --surface: #FFFFFF;       /* sidebar, bars */
+  --raised: #FFFFFF;        /* controls sitting on grouped cards */
+  --sheet: #FFFFFF;         /* modals / bottom sheets */
+  --seg-on: #FFFFFF;        /* selected segment */
+  --bar: rgba(255,255,255,.9);
+  --toast: rgba(28,28,30,.92);
+
+  /* Ink (30%) */
+  --ink: #0B0B0C;
+  --ink-2: #3A3A3C;
+  --sub: #6E6E73;
+  --ter: #AEAEB2;
+  --on-ink: #FFFFFF;        /* text on ink-filled buttons */
+  --hero: #0B0B0C;          /* dark hero cards (countdown, earnings) */
+
+  /* Accent (<10%): the playhead. Action + creative moments only. */
+  --cut: #FF5A1F;
+  --cut-tint: #FFF0E8;
+
+  /* Semantic: one colour, one meaning */
+  --trust: #0A84FF;        /* verified, only */
+  --trust-tint: #E8F2FF;
+  --safe: #1E9E5A;         /* money held safely, ratings */
+  --safe-tint: #E7F6EE;
+  --safe-ink: #16683F;
+  --rating-bg: #1E9E5A;
+  --star: #FFB020;
+  --switch: #34C759;
+
+  /* Radii (continuous corners) */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 16px;
+  --r-xl: 22px;
+  --r-sheet: 24px;
+
+  /* Type */
+  --font: "SF Pro Text", "SF Pro", -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  --font-display: "SF Pro Display", "SF Pro", -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  --font-rounded: "SF Pro Rounded", ui-rounded, -apple-system, "Inter", sans-serif;
+
+  /* Motion (Apple-like springs) */
+  --ease: cubic-bezier(.32, .72, 0, 1);
+  --dur: 380ms;
+
+  /* Space reserved for the status bar (phone frame); overridden per layout */
+  --safe-top: 54px;
+  --safe-bottom: 0px;
+}
+
+/* ------------------------------------------------------------------
+   Dark theme. Applied by js/layout.js as body.T-dark
+   (follows the OS by default; Light / Dark can be forced).
+   Values follow Apple's dark system colours.
+   ------------------------------------------------------------------ */
+body.T-dark {
+  color-scheme: dark;
+  --canvas: #000000;
+  --grouped: #1C1C1E;
+  --line: #2C2C2E;
+  --page: #111113;
+  --surface: #000000;
+  --raised: #2C2C2E;
+  --sheet: #1C1C1E;
+  --seg-on: #636366;
+  --bar: rgba(18,18,20,.86);
+  --toast: rgba(58,58,60,.96);
+
+  --ink: #F5F5F7;
+  --ink-2: #D1D1D6;
+  --sub: #98989F;
+  --ter: #636366;
+  --on-ink: #000000;
+  --hero: #1C1C1E;
+
+  --cut: #FF6A2E;
+  --cut-tint: rgba(255,106,46,.16);
+  --trust: #0A84FF;
+  --trust-tint: rgba(10,132,255,.18);
+  --safe: #30C46B;
+  --safe-tint: rgba(48,196,107,.15);
+  --safe-ink: #7BE0A6;
+}
+/* Cards inside sheets sit one step lighter, like iOS */
+body.T-dark .sheet { --grouped: #2C2C2E; --line: #38383A; --raised: #3A3A3C; }

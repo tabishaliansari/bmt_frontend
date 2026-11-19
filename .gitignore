@@ -1,0 +1,12 @@
+# Secrets (none expected in the frontend, but never commit them)
+.env
+*.env
+
+# Logs
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
