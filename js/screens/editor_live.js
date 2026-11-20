@@ -25,7 +25,7 @@ BMT.screens = BMT.screens || {};
     if (o.serverStatus === "in_progress") return o.changesRequested ? ["Changes requested", "var(--cut-ink)"] : ["Editing", "var(--trust-ink)"];
     if (o.serverStatus === "review") return ["With the client", "var(--trust-ink)"];
     if (o.serverStatus === "approved") return ["Paid", "var(--safe-ink)"];
-    return ["Declined", C.sub];
+    return [o.cancelledAt ? "Cancelled by client" : "Declined", C.sub];
   };
 
   // ---------------------------------------------------------------- Dashboard (linked editor)
@@ -120,7 +120,11 @@ BMT.screens = BMT.screens || {};
       approved: `<div class="cap" style="color:rgba(255,255,255,.6);font-weight:500">APPROVED</div>
         <div class="rounded-num" style="font-size:32px;line-height:40px">Paid ✓</div>
         <div style="font-size:15px;opacity:.75">${esc(o.clientName)} approved your cut.</div>`,
-      refunded: `<div class="cap" style="color:rgba(255,255,255,.6);font-weight:500">DECLINED</div>
+      refunded: o.cancelledAt
+        ? `<div class="cap" style="color:rgba(255,255,255,.6);font-weight:500">CANCELLED</div>
+        <div class="rounded-num" style="font-size:32px;line-height:40px">Order cancelled</div>
+        <div style="font-size:15px;opacity:.75">${esc(o.clientName)} cancelled before you started. Nothing for you to do.</div>`
+        : `<div class="cap" style="color:rgba(255,255,255,.6);font-weight:500">DECLINED</div>
         <div class="rounded-num" style="font-size:32px;line-height:40px">Order declined</div>
         <div style="font-size:15px;opacity:.75">The client's payment was refunded.</div>`,
     }[s] || "";

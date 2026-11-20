@@ -73,13 +73,20 @@ BMT.screens = BMT.screens || {};
     // Live app: the editor really accepts (or declines). Mock mode keeps the prototype's timing.
     const live = !api.BMT_USE_MOCKS;
     const waiting = live && o.serverStatus === "funded";
+    const canCancel = live ? o.serverStatus === "funded" : o.status === "editing";
     // Stage fallback: the client can upload the cut on the editor's behalf (mock mode, or ?standin=1).
     const standin = !live || new URLSearchParams(location.search).has("standin");
     const acceptedStep = !live ? [`${first(e)} accepted`, time(o.placedAt + 8 * 60e3), "done"]
       : waiting ? [`Waiting for ${first(e)} to accept`, "", "live"]
       : o.declinedAt ? [`${first(e)} declined`, time(o.declinedAt), "done"]
       : [`${first(e)} accepted`, o.acceptedAt ? time(o.acceptedAt) : "", "done"];
-    const steps = [
+    // A refunded order stops early: placed → cancelled/declined → refunded.
+    const refundedAt = o.cancelledAt || o.declinedAt;
+    const steps = o.status === "refunded" ? [
+      ["Order placed", time(o.placedAt), "done"],
+      [o.cancelledAt ? "You cancelled the order" : `${first(e)} declined`, refundedAt ? time(refundedAt) : "", "done"],
+      [`${inr(o.total)} refunded to you`, refundedAt ? time(refundedAt) : "", "done"],
+    ] : [
       ["Order placed", time(o.placedAt), "done"],
       acceptedStep,
       [o.status === "editing" && o.revisionsLeft < (o.addons.includes("revision") ? 3 : 2) ? "Working on your notes" : "Editing your video", o.status === "editing" && !waiting ? "Now" : "", waiting ? "todo" : o.status === "editing" ? "live" : "done"],
@@ -107,7 +114,8 @@ BMT.screens = BMT.screens || {};
       approved: `<div class="cap" style="font-size:13px;color:rgba(255,255,255,.6);font-weight:500">DONE</div>
         <div class="rounded-num" style="font-size:36px;line-height:46px">Delivered ✓</div>`,
       refunded: `<div class="cap" style="font-size:13px;color:rgba(255,255,255,.6);font-weight:500">CLOSED</div>
-        <div class="rounded-num" style="font-size:36px;line-height:46px">Refunded</div>`,
+        <div class="rounded-num" style="font-size:36px;line-height:46px">Refunded</div>
+        <div style="font-size:13px;opacity:.7;margin-top:2px">${o.cancelledAt ? "You cancelled before " + esc(first(e)) + " started." : esc(first(e)) + " declined this order."}</div>`,
     }[o.status];
 
     return {
@@ -116,7 +124,7 @@ BMT.screens = BMT.screens || {};
         <div class="between" style="margin-top:4px">
           <button class="icon-btn gray" data-back aria-label="Back">${icon("chev_l", 18, C.ink, 2.4)}</button>
           <span class="h3">Order #${esc(o.id)}</span>
-          <button class="icon-btn gray" id="more" aria-label="More">${icon("more", 18, C.ink, 2)}</button>
+          ${canCancel ? `<button class="icon-btn gray" id="more" aria-label="Order options">${icon("more", 18, C.ink, 2)}</button>` : `<span style="width:36px"></span>`}
         </div>
         <div class="track-grid"><div class="track-a">
         <div class="card-ink" style="margin-top:16px">
@@ -141,7 +149,7 @@ BMT.screens = BMT.screens || {};
         ${o.status === "approved" && o.payout ? receipt(e, o.payout) : `
         <button id="held" style="width:100%;text-align:left;margin-top:22px;border-radius:16px;border:1px solid var(--line);padding:14px;display:flex;gap:12px;align-items:center">
           <div class="icon-tile" style="width:40px;height:40px;border-radius:12px;background:var(--safe-tint)">${icon(o.status === "approved" ? "check" : "lock", 20, C.safe, 2)}</div>
-          <div class="flex-1"><div class="h3" style="font-size:15px">${inr(o.total)} ${o.status === "approved" ? "released" : o.status === "refunded" ? "refunded to you" : "held safely"}</div><div class="foot">${o.status === "approved" ? "Paid to " + first(e) + ". Leave a review?" : o.status === "refunded" ? first(e) + " declined this order, so your payment was returned (simulated)." : "Released to " + first(e) + " only when you approve the final cut."}</div>${o.payment ? `<div class="cap" style="margin-top:2px">${esc(o.payment.method)} · ${esc(o.payment.reference)} · simulated</div>` : ""}</div>
+          <div class="flex-1"><div class="h3" style="font-size:15px">${inr(o.total)} ${o.status === "approved" ? "released" : o.status === "refunded" ? "refunded to you" : "held safely"}</div><div class="foot">${o.status === "approved" ? "Paid to " + first(e) + ". Leave a review?" : o.status === "refunded" ? (o.cancelledAt ? "You cancelled this order, so your payment was returned (simulated)." : first(e) + " declined this order, so your payment was returned (simulated).") : "Released to " + first(e) + " only when you approve the final cut."}</div>${o.payment ? `<div class="cap" style="margin-top:2px">${esc(o.payment.method)} · ${esc(o.payment.reference)} · simulated</div>` : ""}</div>
           ${icon("chev_r", 16, C.ter, 2.2)}
         </button>`}
         ${o.status === "editing" && standin ? `
@@ -162,9 +170,38 @@ BMT.screens = BMT.screens || {};
         const t = setInterval(tick, 1000);
         root.querySelector("#chat").addEventListener("click", () => toast("Chat isn't part of this demo yet", icon("chat", 16, "currentColor")));
         root.querySelector("#held")?.addEventListener("click", () => S.escrowSheet());
-        root.querySelector("#more").addEventListener("click", () => sheet({
-          body: `<div style="margin-top:12px">${[["clock", "Extend the deadline"], ["chat", "Message " + first(e)], ["x", "Cancel and refund"]].map(([ic, t]) => `<button class="list-row" style="width:100%;text-align:left" data-close>${icon(ic, 20, ic === "x" ? C.cut : C.ink)}<span style="font-size:17px;color:${ic === "x" ? C.cut : C.ink}">${t}</span></button>`).join("")}</div>`,
+        // Cancel and refund: only until the editor accepts (the server enforces this too).
+        root.querySelector("#more")?.addEventListener("click", () => sheet({
+          body: `<div style="margin-top:12px"><button class="list-row" id="cancel-row" style="width:100%;text-align:left">${icon("x", 20, C.cut)}<span style="font-size:17px;color:var(--cut-ink)">Cancel and refund</span></button>
+            <p class="sub" style="margin-top:4px">Available until ${esc(first(e))} accepts the order.</p></div>`,
+          onMount(el, closeMenu) {
+            el.querySelector("#cancel-row").addEventListener("click", () => { closeMenu(); setTimeout(confirmCancel, 400); });
+          },
         }));
+        function confirmCancel() {
+          sheet({
+            body: `<div style="text-align:center;margin-top:18px"><h2 class="title-2">Cancel this order?</h2>
+              <p class="sub" style="margin-top:8px">${inr(o.total)} goes back to you and ${esc(first(e))} is told the order is off. This can't be undone.</p>
+              <p class="cap" style="margin-top:6px">Demo: the refund is simulated.</p></div>`,
+            foot: `<button class="btn primary" id="confirm-cancel" style="background:var(--cut-ink)">Cancel and refund ${inr(o.total)}</button>
+              <button class="btn secondary" data-close style="margin-top:8px">Keep my order</button>`,
+            onMount(el, close) {
+              el.querySelector("#confirm-cancel").addEventListener("click", async (ev) => {
+                const btn = ev.currentTarget; btn.disabled = true; btn.textContent = "Refunding…";
+                try {
+                  await api.cancelOrder(o.id);
+                  close();
+                  toast("Order cancelled. Your payment was refunded.", icon("check", 14, C.safe, 2.6));
+                  BMT.a11y.announce("Order cancelled and refunded");
+                  BMT.router.refresh();
+                } catch (err) {
+                  btn.disabled = false; btn.textContent = "Cancel and refund " + inr(o.total);
+                  toast(esc(err.message));
+                }
+              });
+            },
+          });
+        }
 
         const bt = root.querySelector("#brief-toggle");
         bt && bt.addEventListener("click", () => {

@@ -129,7 +129,7 @@ window.BMT = window.BMT || {};
     briefId: o.brief_id, brief: o.brief, review: o.review, payout: o.payout, cutUploadId: o.cut_upload_id,
     thumbnailUploadId: o.thumbnail_upload_id, payment: o.payment, referenceLinks: o.reference_links || [],
     deliveredAt: eventTime(o, "review"), approvedAt: eventTime(o, "approved"),
-    acceptedAt: codeTime(o, "accepted"), declinedAt: codeTime(o, "declined"),
+    acceptedAt: codeTime(o, "accepted"), declinedAt: codeTime(o, "declined"), cancelledAt: codeTime(o, "cancelled"),
     changesRequested: o.timeline.some((t) => t.code === "changes"),
     clientName: o.client_name || "A client", totalUsdRaw: o.total_usd,
   });
@@ -478,6 +478,8 @@ window.BMT = window.BMT || {};
     addNote: async (id, n) => toOrder(await http(`/orders/${enc(id)}/notes`, json("POST", { t: n.t, text: n.text }))),
     requestChanges: async (id) => toOrder(await http(`/orders/${enc(id)}/revisions`, json("POST"))),
     approveOrder: async (id) => toOrder(await http(`/orders/${enc(id)}/approve`, json("POST"))),
+    /** POST /orders/:id/cancel → refunded (only before the editor accepts) */
+    cancelOrder: async (id) => toOrder(await http(`/orders/${enc(id)}/cancel`, json("POST"))),
     /** POST /orders/:id/review → Review Copilot. With feedback, it is rewritten into notes. */
     runReview: (id, feedback) => http(`/orders/${enc(id)}/review`, json("POST", feedback ? { client_feedback: feedback } : {})),
 
@@ -565,6 +567,7 @@ window.BMT = window.BMT || {};
       const o = await mock.getOrder(id);
       return patchOrder(id, { status: "editing", revisionsLeft: Math.max(0, o.revisionsLeft - 1), dueAt: Date.now() + 12 * 3600e3 });
     },
+    cancelOrder: (id) => patchOrder(id, { status: "refunded", cancelledAt: Date.now() }),
     async approveOrder(id) {
       const o = await mock.getOrder(id);
       const gross = o.totalUsd ?? Math.round((o.total / MOCK_FX) * 100) / 100;
