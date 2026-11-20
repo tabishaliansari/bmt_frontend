@@ -115,6 +115,10 @@ window.BMT = window.BMT || {};
     const ev = [...o.timeline].reverse().find((t) => t.status === status);
     return ev ? Date.parse(ev.at) : null;
   };
+  const codeTime = (o, code) => {
+    const ev = [...o.timeline].reverse().find((t) => t.code === code);
+    return ev ? Date.parse(ev.at) : null;
+  };
   const toOrder = (o) => ({
     id: o.id, editorId: o.editor_id, itemId: o.package_id, title: o.title, g: o.g,
     addons: o.addons, rush: o.rush, note: o.note,
@@ -125,6 +129,9 @@ window.BMT = window.BMT || {};
     briefId: o.brief_id, brief: o.brief, review: o.review, payout: o.payout, cutUploadId: o.cut_upload_id,
     thumbnailUploadId: o.thumbnail_upload_id, payment: o.payment,
     deliveredAt: eventTime(o, "review"), approvedAt: eventTime(o, "approved"),
+    acceptedAt: codeTime(o, "accepted"), declinedAt: codeTime(o, "declined"),
+    changesRequested: o.timeline.some((t) => t.code === "changes"),
+    clientName: o.client_name || "A client", totalUsdRaw: o.total_usd,
   });
 
   // ---------------------------------------------------------------- mock data
@@ -471,6 +478,15 @@ window.BMT = window.BMT || {};
     mediaUrl: async (uploadId) => (await http(`/uploads/${enc(uploadId)}/url`)).url,
     /** POST /briefs/:id/thumbnail → Nano Banana drafts a thumbnail concept */
     draftThumbnail: (briefId) => http(`/briefs/${enc(briefId)}/thumbnail`, json("POST")),
+
+    // ---- Editor side (only for Google accounts linked to an editor profile)
+    getJobs: async () => (await http("/editor/orders")).map(toOrder),
+    getJob: async (id) => { const o = await orNull(http(`/editor/orders/${enc(id)}`)); return o && toOrder(o); },
+    /** [{ id, kind, label, filename, url }]: client's raw clips, thumbnail, delivered cut */
+    getJobMedia: (id) => http(`/editor/orders/${enc(id)}/media`),
+    acceptJob: async (id) => toOrder(await http(`/editor/orders/${enc(id)}/accept`, json("POST"))),
+    declineJob: async (id) => toOrder(await http(`/editor/orders/${enc(id)}/decline`, json("POST"))),
+    deliverJob: async (id, cutUploadId) => toOrder(await http(`/editor/orders/${enc(id)}/deliver`, json("POST", { cut_upload_id: cutUploadId }))),
 
     /** Briefs keep the backend shape: { id, upload_ids, client_note, result } */
     createBrief: ({ uploadIds, note }) => http("/briefs", json("POST", { upload_ids: uploadIds, client_note: note || "" })),

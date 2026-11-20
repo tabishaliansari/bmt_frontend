@@ -104,19 +104,10 @@ BMT.screens = BMT.screens || {};
     const profile = api.profile();
     const linked = profile?.editor_id ? await api.getEditor(profile.editor_id) : null;
     const name = (api.currentUser()?.name || "there").split(" ")[0];
+    if (linked) return S.editorDashboard(linked, name);
     return {
       tabs: ui.tabbar("editor", "studio"),
-      html: linked ? `<div class="scroll narrow">
-          <div class="cap" style="font-size:13px;font-weight:500;margin-top:6px">Editor</div>
-          <h1 class="large-title">Hi, ${esc(name)}</h1>
-          <a class="card-gray row gap-12" href="#/editor/${esc(linked.id)}" style="margin-top:14px;text-decoration:none;color:inherit">
-            ${ui.av(esc(linked.initials), linked.av, 46)}
-            <div class="flex-1"><div class="row gap-4 h3">${esc(linked.name)}${ui.seal(16)}</div><div class="foot">Your storefront · ${linked.menu.length} packages</div></div>
-            ${icon("chev_r", 16, C.ter, 2.2)}</a>
-          <div class="section-head"><h2 class="h2">Incoming orders</h2></div>
-          <div class="empty" style="padding:30px 10px">${icon("orders", 32, C.ter)}<div style="margin-top:8px">Orders placed with you show up here, with the client's brief.</div></div>
-        </div>`
-        : `<div class="scroll narrow">
+      html: `<div class="scroll narrow">
           <div class="cap" style="font-size:13px;font-weight:500;margin-top:6px">Editor</div>
           <h1 class="large-title">Thanks, ${esc(name)}</h1>
           <p class="body" style="color:var(--sub);margin-top:8px">Your editor profile is under review. Here's what happens next:</p>

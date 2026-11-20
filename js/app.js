@@ -11,6 +11,7 @@ window.BMT = window.BMT || {};
   const routes = [
     [/^\/?$/, (m, q) => (BMT.api.getMode() === "editor" ? studio : BMT.api.getMode() === "client" ? S.discover : S.welcome)(m, q)],
     [/^\/intro\/(client|editor)$/, S.intro],
+    [/^\/job\/([\w-]+)$/, S.job],
     [/^\/welcome$/, S.welcome],
     [/^\/discover$/, S.discover],
     [/^\/search$/, S.search],
@@ -32,20 +33,20 @@ window.BMT = window.BMT || {};
     [/^\/me$/, editorMe],
   ];
 
-  const PRIVATE_ROUTES = /^\/(start|brief|orders|order|review|studio|studio-orders|me)\b/;
+  const PRIVATE_ROUTES = /^\/(start|brief|orders|order|review|studio|studio-orders|me|job)\b/;
   const host = document.getElementById("screen");
   const side = document.getElementById("sidebar");
   let cleanup = null, stack = [];
 
   // Which sidebar item a route belongs to, per mode
-  const EDITOR_ROUTES = /^\/(studio|studio-orders|add-credit|learn|community|me)\b/;
+  const EDITOR_ROUTES = /^\/(studio|studio-orders|add-credit|learn|community|me|job)\b/;
   function navState(path) {
     if (/^\/(welcome)?$/.test(path) && !BMT.api.getMode()) return null; // welcome: no nav
     if (/^\/intro\//.test(path)) return null; // intro wizard: full screen
     const mode = EDITOR_ROUTES.test(path) ? "editor" : (BMT.api.getMode() || "client");
     const map = mode === "client"
       ? [[/^\/(discover|editor|start|brief)/, "home"], [/^\/search/, "search"], [/^\/(orders|order|review)/, "orders"], [/^\/inbox/, "chat"], [/^\/(you|favs)/, "user"]]
-      : [[/^\/studio$/, "studio"], [/^\/studio-orders/, "orders"], [/^\/community/, "users"], [/^\/learn/, "book"], [/^\/(me|add-credit|editor)/, "user"]];
+      : [[/^\/studio$/, "studio"], [/^\/(studio-orders|job)/, "orders"], [/^\/community/, "users"], [/^\/learn/, "book"], [/^\/(me|add-credit|editor)/, "user"]];
     const hit = map.find(([re]) => re.test(path));
     return { mode, active: hit ? hit[1] : mode === "editor" ? "studio" : "home" };
   }

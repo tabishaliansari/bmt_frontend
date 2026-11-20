@@ -49,11 +49,20 @@ BMT.screens = BMT.screens || {};
     const e = await api.getEditor(o.editorId);
     const thumbUrl = o.thumbnailUploadId ? await api.mediaUrl(o.thumbnailUploadId).catch(() => null) : null;
 
+    // Live app: the editor really accepts (or declines). Mock mode keeps the prototype's timing.
+    const live = !api.BMT_USE_MOCKS;
+    const waiting = live && o.serverStatus === "funded";
+    // Stage fallback: the client can upload the cut on the editor's behalf (mock mode, or ?standin=1).
+    const standin = !live || new URLSearchParams(location.search).has("standin");
+    const acceptedStep = !live ? [`${first(e)} accepted`, time(o.placedAt + 8 * 60e3), "done"]
+      : waiting ? [`Waiting for ${first(e)} to accept`, "", "live"]
+      : o.declinedAt ? [`${first(e)} declined`, time(o.declinedAt), "done"]
+      : [`${first(e)} accepted`, o.acceptedAt ? time(o.acceptedAt) : "", "done"];
     const steps = [
       ["Order placed", time(o.placedAt), "done"],
-      [`${first(e)} accepted`, time(o.placedAt + 8 * 60e3), "done"],
-      [o.status === "editing" && o.revisionsLeft < (o.addons.includes("revision") ? 3 : 2) ? "Working on your notes" : "Editing your video", o.status === "editing" ? "Now" : "", o.status === "editing" ? "live" : "done"],
-      ["First cut ready", o.status === "editing" ? "by " + time(o.dueAt) : "", o.status === "review" ? "live" : o.status === "approved" ? "done" : "todo"],
+      acceptedStep,
+      [o.status === "editing" && o.revisionsLeft < (o.addons.includes("revision") ? 3 : 2) ? "Working on your notes" : "Editing your video", o.status === "editing" && !waiting ? "Now" : "", waiting ? "todo" : o.status === "editing" ? "live" : "done"],
+      ["First cut ready", o.status === "editing" ? "by " + time(o.dueAt) : o.deliveredAt ? time(o.deliveredAt) : "", ["review", "approved"].includes(o.status) ? "done" : "todo"],
       ["Your review", "", o.status === "approved" ? "done" : o.status === "review" ? "live" : "todo"],
       [`Payment released to ${first(e)}`, o.status === "approved" && o.approvedAt ? time(o.approvedAt) : "", o.status === "approved" ? "done" : "todo"],
     ];
@@ -67,7 +76,9 @@ BMT.screens = BMT.screens || {};
     const ticks = Array.from({ length: 38 }, (_, i) => `<div style="width:2px;height:${i % 5 ? 8 : 14}px;background:rgba(255,255,255,${i % 5 ? 0.25 : 0.5})"></div>`).join("");
     const total = o.dueAt - o.placedAt;
 
-    const hero = {
+    const hero = waiting ? `<div class="cap" style="font-size:13px;color:rgba(255,255,255,.6);font-weight:500">WAITING FOR ${esc(first(e).toUpperCase())}</div>
+        <div class="rounded-num" style="font-size:36px;line-height:46px">Order sent</div>
+        <div style="font-size:13px;opacity:.7;margin-top:2px">${esc(first(e))} sees your brief and that payment is held. If they decline, you're refunded.</div>` : {
       editing: `<div class="cap" style="font-size:13px;color:rgba(255,255,255,.6);font-weight:500">${o.revisionsLeft < 2 ? "REVISED CUT IN" : "FIRST CUT IN"}</div>
         <div class="rounded-num" id="left" style="font-size:44px;line-height:52px">${fmtLeft(o.dueAt - Date.now())}</div>`,
       review: `<div class="cap" style="font-size:13px;color:rgba(255,255,255,.6);font-weight:500">YOUR TURN</div>
@@ -108,10 +119,10 @@ BMT.screens = BMT.screens || {};
         ${o.status === "approved" && o.payout ? receipt(e, o.payout) : `
         <button id="held" style="width:100%;text-align:left;margin-top:22px;border-radius:16px;border:1px solid var(--line);padding:14px;display:flex;gap:12px;align-items:center">
           <div class="icon-tile" style="width:40px;height:40px;border-radius:12px;background:var(--safe-tint)">${icon(o.status === "approved" ? "check" : "lock", 20, C.safe, 2)}</div>
-          <div class="flex-1"><div class="h3" style="font-size:15px">${inr(o.total)} ${o.status === "approved" ? "released" : "held safely"}</div><div class="foot">${o.status === "approved" ? "Paid to " + first(e) + ". Leave a review?" : "Released to " + first(e) + " only when you approve the final cut."}</div>${o.payment ? `<div class="cap" style="margin-top:2px">${esc(o.payment.method)} · ${esc(o.payment.reference)} · simulated</div>` : ""}</div>
+          <div class="flex-1"><div class="h3" style="font-size:15px">${inr(o.total)} ${o.status === "approved" ? "released" : o.status === "refunded" ? "refunded to you" : "held safely"}</div><div class="foot">${o.status === "approved" ? "Paid to " + first(e) + ". Leave a review?" : o.status === "refunded" ? first(e) + " declined this order, so your payment was returned (simulated)." : "Released to " + first(e) + " only when you approve the final cut."}</div>${o.payment ? `<div class="cap" style="margin-top:2px">${esc(o.payment.method)} · ${esc(o.payment.reference)} · simulated</div>` : ""}</div>
           ${icon("chev_r", 16, C.ter, 2.2)}
         </button>`}
-        ${o.status === "editing" ? `
+        ${o.status === "editing" && standin ? `
           <label class="btn secondary sm" id="cut-btn" style="margin-top:14px;cursor:pointer">${icon("upload", 16, C.cut, 2)}<span id="cut-label" style="margin-left:6px">Upload the editor's cut</span>
             <input type="file" id="cut-file" accept="video/*" hidden></label>
           <div class="cap" style="text-align:center;margin-top:6px">Demo: stands in for the editor's app</div>` : ""}
