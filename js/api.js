@@ -16,6 +16,29 @@ window.BMT = window.BMT || {};
   const LATENCY = 180;        // fake network delay, ms
   const wait = (v) => new Promise((res) => setTimeout(() => res(structuredClone(v)), LATENCY));
 
+  // ---------------------------------------------------------------- auth (Firebase, Google sign-in)
+  // The server's /config says whether sign-in is on and how to reach Firebase (or its emulator).
+  const session = { mode: "off", auth: null, user: null, features: {} };
+
+  async function initAuth() {
+    if (BMT_USE_MOCKS) return;
+    const cfg = await fetch(API_BASE + "/config").then((r) => r.json()).catch(() => ({ auth: "off" }));
+    session.mode = cfg.auth;
+    session.features = cfg.features || {};
+    if (cfg.auth !== "firebase") return;
+    if (!window.firebase) { console.error("Firebase SDK failed to load; sign-in unavailable."); return; }
+    firebase.initializeApp(cfg.firebase);
+    session.auth = firebase.auth();
+    if (cfg.authEmulator) session.auth.useEmulator(cfg.authEmulator, { disableWarnings: true });
+    await new Promise((resolve) => session.auth.onAuthStateChanged((u) => { session.user = u; resolve(); }));
+  }
+  const ready = initAuth();
+
+  async function authHeaders() {
+    if (!session.user) return {};
+    return { Authorization: `Bearer ${await session.user.getIdToken()}` };
+  }
+
   // ---------------------------------------------------------------- backend
   function apiError(status, body) {
     const err = new Error(body?.error?.message || `Something went wrong (${status}). Please try again.`);
@@ -24,10 +47,10 @@ window.BMT = window.BMT || {};
     return err;
   }
 
-  async function http(path, options) {
+  async function http(path, options = {}) {
     let r;
     try {
-      r = await fetch(API_BASE + path, options);
+      r = await fetch(API_BASE + path, { ...options, headers: { ...(options.headers || {}), ...(await authHeaders()) } });
     } catch {
       throw new Error("Can't reach BMT. Check your connection and try again.");
     }
@@ -37,10 +60,12 @@ window.BMT = window.BMT || {};
   }
 
   /** Multipart upload through XHR, because fetch() can't report upload progress. */
-  function uploadXHR(file, kind, onProgress) {
+  async function uploadXHR(file, kind, onProgress) {
+    const headers = await authHeaders();
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", API_BASE + "/uploads");
+      Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
       xhr.upload.onprogress = (ev) => ev.lengthComputable && onProgress && onProgress(ev.loaded / ev.total);
       xhr.onload = () => {
         let body = null;
@@ -86,6 +111,7 @@ window.BMT = window.BMT || {};
     status: STATUS[o.status], serverStatus: o.status, revisionsLeft: o.revisions_left,
     notes: o.client_notes.map((n) => ({ t: n.t, who: "you", text: n.text })),
     briefId: o.brief_id, brief: o.brief, review: o.review, payout: o.payout, cutUploadId: o.cut_upload_id,
+    thumbnailUploadId: o.thumbnail_upload_id,
     deliveredAt: eventTime(o, "review"), approvedAt: eventTime(o, "approved"),
   });
 
@@ -283,6 +309,37 @@ window.BMT = window.BMT || {};
     BMT_USE_MOCKS,
     RUSH_FEE,
 
+    /** Resolves once sign-in state is known; the router waits for it before the first render. */
+    ready,
+    /** True when this server needs Google sign-in and nobody is signed in yet. */
+    needsSignIn: () => session.mode === "firebase" && !session.user,
+    /** Must be called straight from a click handler (it opens a popup). */
+    signIn() {
+      if (!session.auth) return Promise.reject(new Error("Sign-in isn't available right now. Please reload the page."));
+      const provider = new firebase.auth.GoogleAuthProvider();
+      return session.auth.signInWithPopup(provider)
+        .then((r) => { session.user = r.user; return r.user; })
+        .catch((err) => {
+          // Popup blocked (some phones, in-app browsers): sign in by full-page redirect instead.
+          if (err.code === "auth/popup-blocked" || err.code === "auth/operation-not-supported-in-this-environment") {
+            return session.auth.signInWithRedirect(provider);
+          }
+          throw err;
+        });
+    },
+    async signOut() {
+      if (session.auth) await session.auth.signOut();
+      session.user = null;
+    },
+    currentUser() {
+      const u = session.user;
+      if (!u) return null;
+      const name = u.displayName || u.email || "Signed in";
+      return { name, email: u.email || "", initials: name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase() };
+    },
+    /** Server features: { thumbnail, screening } */
+    features: () => (BMT_USE_MOCKS ? { thumbnail: true, screening: true } : session.features),
+
     getCategories: () => wait(categories),
     getQuickPackages: () => wait(quickPackages),
     quote: (editorId, itemId, opts) => priceOf(editorId, itemId, opts),
@@ -367,7 +424,10 @@ window.BMT = window.BMT || {};
 
     /** POST /uploads (multipart) with upload progress 0..1 */
     uploadFile: uploadXHR,
-    mediaUrl: (uploadId) => `${API_BASE}/uploads/${enc(uploadId)}/content`,
+    /** A short-lived signed link for <video>/<img> (media tags can't send the auth header). */
+    mediaUrl: async (uploadId) => (await http(`/uploads/${enc(uploadId)}/url`)).url,
+    /** POST /briefs/:id/thumbnail → Nano Banana drafts a thumbnail concept */
+    draftThumbnail: (briefId) => http(`/briefs/${enc(briefId)}/thumbnail`, json("POST")),
 
     /** Briefs keep the backend shape: { id, upload_ids, client_note, result } */
     createBrief: ({ uploadIds, note }) => http("/briefs", json("POST", { upload_ids: uploadIds, client_note: note || "" })),
@@ -453,7 +513,18 @@ window.BMT = window.BMT || {};
       mediaUrls[id] = URL.createObjectURL(file);
       return { id, kind, filename: file.name, mime: file.type, size: file.size };
     },
-    mediaUrl: (uploadId) => mediaUrls[uploadId] || null,
+    mediaUrl: async (uploadId) => mediaUrls[uploadId] || null,
+    async draftThumbnail(briefId) {
+      await delay(2000);
+      const briefs = store.get("briefs", {});
+      const b = briefs[briefId];
+      const id = "up_mockthumb" + Object.keys(mediaUrls).length;
+      const title = b.result.title.replace(/[<&>"]/g, "");
+      mediaUrls[id] = "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="360" height="640"><rect width="360" height="640" fill="#2B1055"/><text x="24" y="560" font-family="sans-serif" font-size="40" font-weight="700" fill="white">${title}</text></svg>`);
+      briefs[briefId] = { ...b, thumbnail_upload_id: id };
+      store.set("briefs", briefs);
+      return briefs[briefId];
+    },
 
     async createBrief({ uploadIds, note }) {
       await delay(3000);

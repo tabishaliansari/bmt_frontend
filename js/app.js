@@ -26,6 +26,7 @@ window.BMT = window.BMT || {};
     [/^\/me$/, S.me],
   ];
 
+  const PRIVATE_ROUTES = /^\/(start|brief|orders|order|review)\b/;
   const host = document.getElementById("screen");
   const side = document.getElementById("sidebar");
   let cleanup = null, stack = [];
@@ -52,7 +53,9 @@ window.BMT = window.BMT || {};
     });
   }
 
+  let renderSeq = 0;
   async function render(direction) {
+    const seq = ++renderSeq;
     const raw = location.hash.replace(/^#/, "") || "/";
     const [path, qs] = raw.split("?");
     const query = new URLSearchParams(qs || "");
@@ -65,7 +68,16 @@ window.BMT = window.BMT || {};
     cleanup = null;
 
     renderNav(path);
-    const view = await fn(match || [], query);
+    // Private screens (your footage, briefs, orders) need Google sign-in first.
+    if (PRIVATE_ROUTES.test(path) && BMT.api.needsSignIn()) fn = S.signIn;
+    let view;
+    try {
+      view = await fn(match || [], query);
+    } catch (err) {
+      view = await S.loadError(err);
+    }
+    // A newer navigation started while this screen was loading: drop this one.
+    if (seq !== renderSeq) return;
     const el = document.createElement("div");
     el.className = "screen" + (view.dark ? " dark" : "") + (direction ? " " + direction : "");
     el.innerHTML = view.html + (view.tabs || "");
@@ -95,8 +107,8 @@ window.BMT = window.BMT || {};
 
   BMT.router = { refresh: () => render(), back };
 
-  // boot
+  // boot: wait until sign-in state is known, so the first screen loads with the right user
   document.querySelector(".device").insertAdjacentHTML("afterbegin", BMT.ui.statusBar());
   stack.push(location.hash || "#/");
-  render();
+  BMT.api.ready.finally(() => render());
 })();

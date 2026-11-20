@@ -152,11 +152,43 @@ BMT.screens = BMT.screens || {};
           <div class="sec card-gray"><div class="label">Recommended package</div>
             <div class="h3">${esc(r.recommended_package.package_title)}</div><div class="foot" style="margin-top:2px">${esc(r.recommended_package.reason)}</div></div>
           <div class="ai-label">${icon("sparkle", 14, C.cut)} Written by Gemini · tap any text to edit it</div>
+          ${brief.screened_by ? `<div class="ai-label" style="margin-top:4px">${icon("shield", 14, C.safe, 2)} Your note was checked by Gemma</div>` : ""}
         </article>
+        ${api.features().thumbnail ? `<section class="brief-doc" id="thumb-box">
+          <div class="label" style="font-size:12px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.4px">Thumbnail concept</div>
+          <div id="thumb-body" style="margin-top:8px"></div>
+        </section>` : ""}
         <a href="#/brief/${esc(brief.id)}/editors" class="btn primary" id="find" style="margin-top:16px;text-decoration:none">Find editors for this</a>
       </div>`,
       mount(root) {
         api.setActiveBrief(brief);
+        const thumbBody = root.querySelector("#thumb-body");
+        let stopThumb = null;
+        const showThumb = async (uploadId) => {
+          const url = await api.mediaUrl(uploadId);
+          thumbBody.innerHTML = `<img src="${esc(url)}" alt="Thumbnail concept for ${esc(r.title)}" style="display:block;max-width:100%;max-height:420px;border-radius:14px;margin:0 auto">
+            <div class="ai-label" style="justify-content:center">${icon("sparkle", 14, C.cut)} Drafted by Nano Banana · the editor will refine it</div>
+            <button class="btn secondary sm" id="thumb-go" style="margin-top:10px">Draft another</button>`;
+          thumbBody.querySelector("#thumb-go").addEventListener("click", draft);
+        };
+        const showButton = (message) => {
+          thumbBody.innerHTML = `${message ? `<div class="msg" style="font-size:15px;line-height:20px;margin-bottom:10px" role="alert">${esc(message)}</div>` : `<div class="foot" style="margin-bottom:10px">Nano Banana turns your brief into a thumbnail idea for the editor.</div>`}
+            <button class="btn secondary sm" id="thumb-go">${icon("image", 16, C.cut, 2)}<span style="margin-left:6px">${message ? "Try again" : "Draft a thumbnail"}</span></button>`;
+          thumbBody.querySelector("#thumb-go").addEventListener("click", draft);
+        };
+        async function draft() {
+          stopThumb = aiProgress(thumbBody, ["Reading your brief…", "Sketching the thumbnail…"]);
+          try {
+            const updated = await api.draftThumbnail(brief.id);
+            stopThumb();
+            brief.thumbnail_upload_id = updated.thumbnail_upload_id;
+            await showThumb(updated.thumbnail_upload_id);
+          } catch (err) {
+            stopThumb();
+            showButton(`Nano Banana couldn't draft a thumbnail (${err.message}) You can skip this step.`);
+          }
+        }
+        if (thumbBody) brief.thumbnail_upload_id ? showThumb(brief.thumbnail_upload_id).catch(() => showButton()) : showButton();
         const collect = () => {
           const next = structuredClone(r);
           root.querySelectorAll("[data-f]").forEach((el) => (next[el.dataset.f] = el.textContent.trim()));
@@ -183,6 +215,7 @@ BMT.screens = BMT.screens || {};
           el.addEventListener("blur", save);
           el.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); el.blur(); } });
         });
+        return () => stopThumb && stopThumb();
       },
     };
   };
@@ -202,7 +235,7 @@ BMT.screens = BMT.screens || {};
           <div class="row gap-8">${icon("sparkle", 16, C.cut)}<span class="h3" style="font-size:15px">${esc(brief.result.title)}</span></div>
           <div class="foot" style="margin-top:4px">Looking for: ${esc(rec.package_title)}. ${esc(rec.reason)}</div>
         </div>
-        <div class="section-head"><h2 class="h2">Best matches</h2><span class="cap">Best rated first</span></div>
+        <div class="section-head"><h2 class="h2">Best matches</h2><span class="cap">Featured, then best rated</span></div>
         <div class="ed-grid">${editors.length ? editors.map(S.editorCard).join("") : `<div class="empty">No editors in this category yet.<br><a class="link" href="#/discover">Browse all editors</a></div>`}</div>
       </div>`,
       mount(root) {

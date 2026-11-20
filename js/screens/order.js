@@ -17,11 +17,12 @@ BMT.screens = BMT.screens || {};
   const first = (e) => e.name.split(" ")[0];
 
   // ---------------------------------------------------------------- 06 Tracking
-  const briefCard = (b) => `
+  const briefCard = (b, thumbUrl) => `
     <button class="brief-card" id="brief-toggle" aria-expanded="false">
       <div class="between"><span class="row gap-8">${icon("sparkle", 16, C.cut, 2)}<span class="h3" style="font-size:15px">Your brief</span></span><span id="brief-chev">${icon("chev_d", 16, C.sub, 2.2)}</span></div>
       <div class="foot" style="margin-top:2px">${esc(b.title)} · ${b.target_length_sec} sec</div>
       <div id="brief-body" hidden style="margin-top:12px">
+        ${thumbUrl ? `<img src="${esc(thumbUrl)}" alt="Thumbnail concept" style="display:block;max-height:200px;border-radius:10px;margin-bottom:10px">` : ""}
         <div class="cap" style="font-weight:600">HOOK</div><div style="font-size:15px;line-height:20px;margin-top:2px">${esc(b.hook_idea)}</div>
         <div class="cap" style="font-weight:600;margin-top:10px">MUST INCLUDE</div><div style="font-size:15px;line-height:20px;margin-top:2px">${b.must_include.map(esc).join(" · ")}</div>
         <div class="cap" style="font-weight:600;margin-top:10px">STYLE</div><div style="font-size:15px;line-height:20px;margin-top:2px">${esc(b.style_notes)}</div>
@@ -40,6 +41,7 @@ BMT.screens = BMT.screens || {};
     const o = await api.getOrder(id);
     if (!o) return S.notFound();
     const e = await api.getEditor(o.editorId);
+    const thumbUrl = o.thumbnailUploadId ? await api.mediaUrl(o.thumbnailUploadId).catch(() => null) : null;
 
     const steps = [
       ["Order placed", time(o.placedAt), "done"],
@@ -94,7 +96,7 @@ BMT.screens = BMT.screens || {};
           <a href="#/editor/${e.id}" class="flex-1" style="text-decoration:none;color:inherit"><div class="row gap-4" style="font-size:15px;font-weight:600">${e.name}${seal(14)}</div><div class="foot">Usually replies in ${e.reply}</div></a>
           <button class="icon-btn" id="chat" style="background:var(--raised);width:40px;height:40px" aria-label="Message">${icon("chat", 19, C.ink, 2)}</button>
         </div>
-        ${o.brief ? briefCard(o.brief) : ""}
+        ${o.brief ? briefCard(o.brief, thumbUrl) : ""}
         </div><div class="track-b">
         <div style="margin-top:22px" class="steps">${stepHTML}</div>
         ${o.status === "approved" && o.payout ? receipt(e, o.payout) : `
@@ -187,7 +189,7 @@ BMT.screens = BMT.screens || {};
     const o = await api.getOrder(id);
     if (!o) return S.notFound();
     const e = await api.getEditor(o.editorId);
-    const src = o.cutUploadId ? api.mediaUrl(o.cutUploadId) : null;
+    const src = o.cutUploadId ? await api.mediaUrl(o.cutUploadId).catch(() => null) : null;
     const canAct = o.status === "review";
     let duration = 58, pos = 0, playing = false;
     let review = o.review, pinned = [...o.notes];
@@ -286,7 +288,8 @@ BMT.screens = BMT.screens || {};
             ${canAct ? `<div style="font-size:14px;font-weight:600;margin-top:16px">Tell the editor what you want, in your own words</div>
             <textarea id="fb" maxlength="1000" placeholder="e.g. make it more cinematic"></textarea>
             <div id="fb-status" style="font-size:14px;margin-top:8px"></div>
-            <button class="btn secondary sm" id="fb-go" style="margin-top:8px">Turn into notes</button>` : ""}`;
+            <button class="btn secondary sm" id="fb-go" style="margin-top:8px">Turn into notes</button>
+            ${api.features().screening ? `<div class="row gap-4" style="font-size:12px;color:rgba(255,255,255,.5);margin-top:8px">${icon("shield", 12, C.safe, 2)} Feedback is checked by Gemma first</div>` : ""}` : ""}`;
           const go = ai.querySelector("#fb-go");
           go && go.addEventListener("click", () => {
             const text = ai.querySelector("#fb").value.trim();

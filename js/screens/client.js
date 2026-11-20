@@ -392,6 +392,9 @@ BMT.screens = BMT.screens || {};
         el.querySelector("#protect").addEventListener("click", escrowSheet);
         el.querySelector("#place").addEventListener("click", async (ev) => {
           const btn = ev.currentTarget;
+          if (api.needsSignIn()) {
+            try { await api.signIn(); } catch (err) { if (err.code !== "auth/popup-closed-by-user") toast(esc(err.message)); return; }
+          }
           btn.disabled = true; btn.textContent = "Placing order…";
           try {
             const order = await api.placeOrder({ editorId: e.id, itemId, addons: cart.addons, rush: cart.rush, note: el.querySelector("#note").value, briefId: brief?.id || null });
@@ -454,15 +457,26 @@ BMT.screens = BMT.screens || {};
   });
 
   // ---------------------------------------------------------------- You
+  const accountCard = () => {
+    const me = api.currentUser();
+    if (me) return `<div class="card-gray row gap-12" style="margin-top:12px">${av(esc(me.initials), 1, 56)}<div class="flex-1" style="min-width:0"><div class="h3">${esc(me.name)}</div><div class="foot">${esc(me.email)}</div></div><button class="btn secondary sm" id="signout" style="width:auto;padding:0 14px">Sign out</button></div>`;
+    if (api.needsSignIn()) return `<div class="card-gray row gap-12" style="margin-top:12px">${av("?", 1, 56)}<div class="flex-1"><div class="h3">Not signed in</div><div class="foot">Sign in to upload footage and order</div></div><button class="btn primary sm" id="signin" style="width:auto;padding:0 14px">Sign in</button></div>`;
+    return `<div class="card-gray row gap-12" style="margin-top:12px">${av("TA", 1, 56)}<div class="flex-1"><div class="h3">Tabish A.</div><div class="foot">Client · Pune</div></div></div>`;
+  };
+
   S.you = async () => ({
     tabs: tabbar("client", "user"),
     html: `<div class="scroll"><h1 class="large-title" style="margin-top:6px">You</h1>
-      <div class="card-gray row gap-12" style="margin-top:12px">${av("TA", 1, 56)}<div class="flex-1"><div class="h3">Tabish A.</div><div class="foot">Client · Pune</div></div></div>
+      ${accountCard()}
       <div style="margin-top:20px">
         ${[["heart", "Favourite editors", "#/favs"], ["orders", "Order history", "#/orders"], ["shield", "How payments are protected", "escrow"], ["studio", BMT.layout.isDesktop() ? "View mobile version" : "View desktop version", "layout"], ["sparkle", "Appearance · " + ({ auto: "Automatic", light: "Light", dark: "Dark" })[BMT.theme.get()], "theme"], ["swap", "Switch to editor mode", "switch"], ["repeat", "Reset demo data", "reset"]].map(([ic, t, act]) => `
           <button class="list-row" style="width:100%;text-align:left" data-act="${act}"><div class="icon-tile" style="background:var(--grouped)">${icon(ic, 18, C.ink2)}</div><span class="flex-1" style="font-size:17px">${t}</span>${icon("chev_r", 16, C.ter, 2.2)}</button>`).join("")}
       </div></div>`,
     mount(root) {
+      root.querySelector("#signout")?.addEventListener("click", async () => { await api.signOut(); toast("Signed out"); location.hash = "#/discover"; });
+      root.querySelector("#signin")?.addEventListener("click", () => {
+        api.signIn().then(() => BMT.router.refresh()).catch((err) => { if (err.code !== "auth/popup-closed-by-user") toast(esc(err.message)); });
+      });
       root.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => {
         const a = b.dataset.act;
         if (a.startsWith("#")) location.hash = a;
@@ -492,4 +506,33 @@ BMT.screens = BMT.screens || {};
   };
 
   S.notFound = async () => ({ html: `<div class="scroll"><div class="empty"><div class="h3">Not found</div><a class="link" href="#/discover">Back to Discover</a></div></div>` });
+
+  // ---------------------------------------------------------------- Sign in (Firebase, Google)
+  S.signIn = async () => ({
+    tabs: tabbar("client", "home"),
+    html: `<div class="scroll narrow"><div class="empty" style="padding-top:80px">
+      <div style="display:flex;justify-content:center">${logo(56)}</div>
+      <h1 class="title-2" style="margin-top:18px;color:var(--ink)">Sign in to continue</h1>
+      <p class="sub" style="margin-top:8px">Your footage, briefs and orders are private to your account.</p>
+      <button class="btn primary" id="google" style="margin-top:22px">Continue with Google</button>
+      <a class="link" href="#/discover" style="display:block;margin-top:14px">Keep browsing editors</a>
+    </div></div>`,
+    mount(root) {
+      root.querySelector("#google").addEventListener("click", (ev) => {
+        const btn = ev.currentTarget;
+        btn.disabled = true;
+        api.signIn()
+          .then(() => { toast("Signed in", icon("check", 14, C.safe, 2.6)); BMT.router.refresh(); })
+          .catch((err) => { btn.disabled = false; if (err.code !== "auth/popup-closed-by-user") toast(esc(err.message)); });
+      });
+    },
+  });
+
+  S.loadError = async (err) => ({
+    tabs: tabbar("client", "home"),
+    html: `<div class="scroll narrow"><div class="err-card" role="alert" style="margin-top:40px">
+      <div class="msg">${esc(err.message || "Something went wrong.")}</div>
+      <button class="btn secondary sm" id="retry" style="margin-top:12px">Try again</button></div></div>`,
+    mount(root) { root.querySelector("#retry").addEventListener("click", () => BMT.router.refresh()); },
+  });
 })();
