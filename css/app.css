@@ -386,15 +386,23 @@ body.L-desk .review-b { max-height: calc(100vh - 160px); overflow-y: auto; }
 .receipt-lines { margin-top: 8px; font-size: 13px; line-height: 19px; }
 .receipt-lines .between { gap: 12px; }
 
-/* ---------- First-run intro wizard ---------- */
-.intro-art { margin-top: 22px; height: 220px; border-radius: var(--r-xl); display: flex; align-items: center; justify-content: center; }
-.intro-icon { width: 76px; height: 76px; border-radius: 50%; background: rgba(255,255,255,.18); display: flex; align-items: center; justify-content: center; }
-.intro-dots { display: flex; gap: 6px; margin-top: 18px; }
-.intro-dots span { width: 7px; height: 7px; border-radius: 4px; background: var(--line); transition: width .2s, background .2s; }
-.intro-dots span.on { width: 22px; background: var(--cut); }
-body.L-desk .intro-art { height: 260px; }
-
 /* ---------- Editor job page ---------- */
 .job-media { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 10px; }
 .job-clip video { width: 100%; max-height: 360px; border-radius: 12px; background: #000; display: block; }
 body.L-desk .job-media { grid-template-columns: 1fr 1fr; }
+
+/* ---------- Product tour (js/tour.js) ---------- */
+.tour { position: fixed; inset: 0; z-index: 3000; opacity: 0; transition: opacity .2s; }
+.tour.on { opacity: 1; }
+.tour-block { position: fixed; inset: 0; } /* transparent: blocks clicks on the page underneath */
+.tour-dim { position: fixed; background: rgba(0,0,0,.6); pointer-events: none; }
+.tour-spot { position: fixed; border-radius: 14px; outline: 2px solid var(--cut); outline-offset: 2px; pointer-events: none; }
+.tour-card { position: fixed; background: var(--sheet); color: var(--ink); border-radius: var(--r-lg); padding: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.28); font-family: var(--font); transition: top .25s var(--ease), left .25s var(--ease); }
+.tour-count { font-size: 12px; font-weight: 600; color: var(--cut); }
+.tour-title { font-size: 17px; font-weight: 700; margin-top: 4px; letter-spacing: -0.2px; }
+.tour-text { font-size: 15px; line-height: 21px; color: var(--sub); margin-top: 4px; }
+.tour-actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.tour-skip { font-size: 14px; color: var(--sub); padding: 6px 2px; }
+.tour-back { font-size: 15px; font-weight: 600; padding: 8px 12px; border-radius: 10px; background: var(--grouped); color: var(--ink); }
+.tour-next { font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: 10px; background: var(--ink); color: var(--on-ink); }
+.tour-back[hidden] { display: none; }

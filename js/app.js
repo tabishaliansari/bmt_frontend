@@ -10,7 +10,6 @@ window.BMT = window.BMT || {};
   const editorMe = (m, q) => (live() ? S.you : S.me)(m, q);
   const routes = [
     [/^\/?$/, (m, q) => (BMT.api.getMode() === "editor" ? studio : BMT.api.getMode() === "client" ? S.discover : S.welcome)(m, q)],
-    [/^\/intro\/(client|editor)$/, S.intro],
     [/^\/job\/([\w-]+)$/, S.job],
     [/^\/welcome$/, S.welcome],
     [/^\/discover$/, S.discover],
@@ -42,7 +41,6 @@ window.BMT = window.BMT || {};
   const EDITOR_ROUTES = /^\/(studio|studio-orders|add-credit|learn|community|me|job)\b/;
   function navState(path) {
     if (/^\/(welcome)?$/.test(path) && !BMT.api.getMode()) return null; // welcome: no nav
-    if (/^\/intro\//.test(path)) return null; // intro wizard: full screen
     const mode = EDITOR_ROUTES.test(path) ? "editor" : (BMT.api.getMode() || "client");
     const map = mode === "client"
       ? [[/^\/(discover|editor|start|brief)/, "home"], [/^\/search/, "search"], [/^\/(orders|order|review)/, "orders"], [/^\/inbox/, "chat"], [/^\/(you|favs)/, "user"]]
@@ -69,6 +67,7 @@ window.BMT = window.BMT || {};
 
     // close any open sheets/peeks from the previous screen
     document.querySelectorAll(".sheet, .sheet-backdrop, .peek").forEach((n) => n.remove());
+    BMT.tour.stop();
     if (typeof cleanup === "function") cleanup();
     cleanup = null;
 
@@ -96,6 +95,13 @@ window.BMT = window.BMT || {};
 
     el.querySelectorAll("[data-back]").forEach((b) => b.addEventListener("click", back));
     if (view.mount) cleanup = view.mount(el) || null;
+
+    // "?tour=1": start the product tour on this screen once it has settled, then drop the flag
+    // so a refresh doesn't restart it.
+    if (query.get("tour")) {
+      history.replaceState(null, "", location.pathname + location.search + "#" + path);
+      setTimeout(() => { if (seq === renderSeq) S.runTour(BMT.api.getMode() || "client"); }, 450);
+    }
   }
 
   function back() {

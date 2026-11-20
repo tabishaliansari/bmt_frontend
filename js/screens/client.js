@@ -463,7 +463,7 @@ BMT.screens = BMT.screens || {};
     html: `<div class="scroll"><h1 class="large-title" style="margin-top:6px">You</h1>
       ${accountCard()}
       <div style="margin-top:20px">
-        ${[...(role === "client" ? [["heart", "Favourite editors", "#/favs"], ["orders", "Order history", "#/orders"]] : []), ["shield", "How payments are protected", "escrow"], ["play", "Replay the intro", "intro"], ["studio", BMT.layout.isDesktop() ? "View mobile version" : "View desktop version", "layout"], ["sparkle", "Appearance · " + ({ auto: "Automatic", light: "Light", dark: "Dark" })[BMT.theme.get()], "theme"], ["swap", role === "editor" ? "Switch to client mode" : "Switch to editor mode", "switch"], ["repeat", "Reset demo data", "reset"]].map(([ic, t, act]) => `
+        ${[...(role === "client" ? [["heart", "Favourite editors", "#/favs"], ["orders", "Order history", "#/orders"]] : []), ["shield", "How payments are protected", "escrow"], ["play", "Take the tour", "intro"], ["studio", BMT.layout.isDesktop() ? "View mobile version" : "View desktop version", "layout"], ["sparkle", "Appearance · " + ({ auto: "Automatic", light: "Light", dark: "Dark" })[BMT.theme.get()], "theme"], ["swap", role === "editor" ? "Switch to client mode" : "Switch to editor mode", "switch"], ["repeat", "Reset demo data", "reset"]].map(([ic, t, act]) => `
           <button class="list-row" style="width:100%;text-align:left" data-act="${act}"><div class="icon-tile" style="background:var(--grouped)">${icon(ic, 18, C.ink2)}</div><span class="flex-1" style="font-size:17px">${t}</span>${icon("chev_r", 16, C.ter, 2.2)}</button>`).join("")}
       </div></div>`,
     mount(root) {
@@ -482,7 +482,7 @@ BMT.screens = BMT.screens || {};
             onMount(el) { el.querySelectorAll("[data-t]").forEach((x) => x.addEventListener("click", () => { BMT.theme.set(x.dataset.t); BMT.router.refresh(); })); },
           });
           else if (a === "switch") S.enterRole(role === "editor" ? "client" : "editor");
-          else if (a === "intro") location.hash = "#/intro/" + role;
+          else if (a === "intro") location.hash = S.tourHref(role);
         else if (a === "reset") { api.resetDemo(); BMT.cart = null; location.hash = "#/"; }
       }));
     },

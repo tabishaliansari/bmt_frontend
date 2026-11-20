@@ -38,12 +38,13 @@ BMT.screens = BMT.screens || {};
       html: `<div class="scroll narrow">
         <div class="cap" style="font-size:13px;font-weight:500;margin-top:6px">Editor</div>
         <h1 class="large-title">Hi, ${esc(name)}</h1>
-        <div class="row gap-8" style="margin-top:14px">
+        <div class="row gap-8 editor-stats" style="margin-top:14px">
           <div class="stat-box"><div class="v">${fresh}</div><div class="cap">new orders</div></div>
           <div class="stat-box"><div class="v">${jobs.filter((o) => ["in_progress", "review"].includes(o.serverStatus)).length}</div><div class="cap">in progress</div></div>
           <div class="stat-box"><div class="v">${inr(Math.round(earned))}</div><div class="cap">paid via Ramp</div></div>
         </div>
         <div class="section-head"><h2 class="h2">Orders</h2><a class="link" href="#/editor/${esc(editor.id)}">My storefront</a></div>
+        <div class="editor-orders">
         ${jobs.length ? jobs.map((o) => {
           const [label, colour] = jobState(o);
           return `<a href="#/job/${esc(o.id)}" class="list-row" style="text-decoration:none;color:inherit">
@@ -54,6 +55,7 @@ BMT.screens = BMT.screens || {};
             <div style="text-align:right"><div style="font-size:15px;font-weight:600">${inr(o.total)}</div>${icon("chev_r", 16, C.ter, 2.2)}</div>
           </a>`;
         }).join("") : `<div class="empty" style="padding:30px 10px">${icon("orders", 32, C.ter)}<div style="margin-top:8px">No orders yet. When a client orders one of your packages, it shows up here with their brief.</div></div>`}
+        </div>
       </div>`,
     };
   };
