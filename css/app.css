@@ -449,3 +449,14 @@ body.A-motion *, body.A-motion *::before, body.A-motion *::after { animation-dur
 .a11y-set { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 0; border-bottom: 1px solid var(--line); text-align: left; min-height: 48px; }
 .a11y-set:last-child { border-bottom: 0; }
 .a11y-set .sub { font-size: 13px; line-height: 18px; }
+
+/* ---------- References (Start screen, brief, editor job) ---------- */
+.ref-add { display: flex; gap: 8px; align-items: center; }
+.ref-add input { flex: 1; min-width: 0; height: 44px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--grouped); padding: 0 12px; font-size: 15px; }
+.ref-add .btn { width: auto; padding: 0 16px; height: 44px; }
+.ref-link { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.ref-clip-btn { display: inline-flex; gap: 8px; align-items: center; margin-top: 12px; min-height: 44px; font-size: 15px; font-weight: 500; color: var(--ink-2); cursor: pointer; }
+.ref-insight { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.ref-insight:last-child { border-bottom: 0; }
+.ref-insight .src { font-size: 13px; font-weight: 700; color: var(--cut-ink); }
+.ref-insight .lnk { color: var(--trust-ink); font-size: 13px; word-break: break-all; }

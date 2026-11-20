@@ -61,7 +61,7 @@ BMT.screens = BMT.screens || {};
   };
 
   // ---------------------------------------------------------------- One order (job)
-  const briefHTML = (b, clipNames) => `
+  const briefHTML = (b, clipNames, links, refClipCount) => `
     <div class="brief-doc">
       <div class="title-2">${esc(b.title)}</div>
       <div class="row gap-8" style="margin-top:8px;flex-wrap:wrap">${chip(esc(b.format), "best", icon("play", 10, C.cut))}${chip(b.target_length_sec + " sec", "safe", icon("clock", 11, C.safe, 2.2))}</div>
@@ -70,6 +70,7 @@ BMT.screens = BMT.screens || {};
         <div class="moment"><span class="ts-chip">${esc(m.start)}–${esc(m.end)}</span>
           <div class="flex-1"><div style="font-size:15px;line-height:20px">${esc(m.why)}</div><div class="cap">${esc(clipNames[m.upload_id] || "Clip")}</div></div></div>`).join("")}</div>
       <div class="sec"><div class="label">Style</div><div style="font-size:15px;line-height:21px">${esc(b.style_notes)}</div></div>
+      ${ui.referencesSec(b.references, links, refClipCount, "The client's references")}
       <div class="sec"><div class="label">Must include</div><ul>${b.must_include.map((t) => `<li>${icon("check", 16, C.safe, 2.2)}<span>${esc(t)}</span></li>`).join("")}</ul></div>
       ${b.questions_for_client.length ? `<div class="sec"><div class="label">Open questions for the client</div><ul>${b.questions_for_client.map((t) => `<li>${icon("chat", 16, C.sub, 2.2)}<span>${esc(t)}</span></li>`).join("")}</ul></div>` : ""}
       <div class="ai-label">${icon("sparkle", 14, C.cut)} Brief written by Gemini from the client's footage</div>
@@ -95,7 +96,8 @@ BMT.screens = BMT.screens || {};
     const o = await api.getJob(id);
     if (!o) return S.notFound();
     const media = await api.getJobMedia(id).catch(() => []);
-    const raws = media.filter((m) => m.kind === "raw");
+    const raws = media.filter((m) => m.kind === "raw" || m.kind === "ref");
+    const refClipCount = media.filter((m) => m.kind === "ref").length;
     const thumbItem = media.find((m) => m.kind === "thumb");
     const clipNames = Object.fromEntries(raws.map((m) => [m.id, m.label]));
     const [label] = jobState(o);
@@ -145,7 +147,7 @@ BMT.screens = BMT.screens || {};
         <div class="card-ink" style="margin-top:16px">${hero}</div>
         ${money}
         ${notesHTML(o)}
-        ${o.brief ? `<div class="section-head"><h2 class="h2">The brief</h2></div>${briefHTML(o.brief, clipNames)}` : ""}
+        ${o.brief ? `<div class="section-head"><h2 class="h2">The brief</h2></div>${briefHTML(o.brief, clipNames, o.referenceLinks, refClipCount)}` : ""}
         ${o.note ? `<div class="card-gray" style="margin-top:14px"><div class="cap" style="font-weight:600">NOTE FROM ${esc(o.clientName.toUpperCase())}</div><div style="font-size:15px;line-height:20px;margin-top:4px">${esc(o.note)}</div></div>` : ""}
         ${raws.length || thumbItem ? `<div class="section-head"><h2 class="h2">Client's footage</h2><span class="cap">${raws.length} clip${raws.length === 1 ? "" : "s"}</span></div>
           <div class="job-media">${raws.map((m) => `

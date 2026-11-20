@@ -202,6 +202,23 @@ window.BMT = window.BMT || {};
       <svg width="27" height="13" viewBox="0 0 27 13"><rect x="0.5" y="0.5" width="23" height="12" rx="3.5" stroke="currentColor" stroke-opacity=".4" fill="none"/><rect x="2" y="2" width="19" height="9" rx="2" fill="currentColor"/><rect x="24.5" y="4.5" width="1.6" height="4" rx=".8" fill="currentColor" fill-opacity=".45"/></svg>
     </div></div>`;
 
+  /** Gemini's notes on the client's references. Labels run clips first, then links. */
+  function referencesSec(refs, links = [], clipCount = 0, heading = "Inspired by your references") {
+    if (!refs || !refs.length) return "";
+    const linkFor = (source) => {
+      const n = parseInt(String(source).replace(/\D/g, ""), 10);
+      return n > clipCount ? links[n - clipCount - 1] : null;
+    };
+    const safeHref = (l) => (/^https?:\/\//i.test(l || "") ? l : null);
+    return `<div class="sec"><div class="label">${heading}</div>${refs.map((r) => {
+      const href = safeHref(linkFor(r.source));
+      return `<div class="ref-insight"><div class="src">${esc(r.source)}${href ? "" : " · clip"}</div>
+        ${href ? `<a class="lnk" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(href)}</a>` : ""}
+        <div style="font-size:15px;line-height:20px;margin-top:4px">${esc(r.takeaway)}</div>
+        <div class="cap" style="margin-top:2px">→ ${esc(r.apply)}</div></div>`;
+    }).join("")}</div>`;
+  }
+
   const isDesktop = () => document.body.classList.contains("L-desk");
 
   // ------------------------------------------------------------ skeletons (shown while a screen loads)
@@ -229,5 +246,5 @@ window.BMT = window.BMT || {};
   /** A loading placeholder shaped like the screen that's coming: grid | detail | list | order | doc */
   const skeleton = (kind) => `<div aria-busy="true" aria-label="Loading">${(SKELETONS[kind] || SKELETONS.list)()}</div>`;
 
-  BMT.ui = { C, G, icon, seal, yt, logo, av, thumb, playBadge, chip, rating, tagChip, inr, usd, esc, aiProgress, compact, tabbar, sidebar, toast, sheet, onLongPress, peek, statusBar, isDesktop, skeleton };
+  BMT.ui = { C, G, icon, seal, yt, logo, av, thumb, playBadge, chip, rating, tagChip, inr, usd, esc, aiProgress, compact, tabbar, sidebar, toast, sheet, onLongPress, peek, statusBar, isDesktop, skeleton, referencesSec };
 })();

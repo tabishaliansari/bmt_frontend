@@ -24,14 +24,22 @@ BMT.screens = BMT.screens || {};
     </div>`;
 
   // ---------------------------------------------------------------- Start with your footage
+  const MAX_REF_CLIPS = 2, MAX_LINKS = 3;
+  const YT = /^(www\.|m\.)?(youtube\.com|youtu\.be)$/i;
+  const isYouTube = (link) => { try { return YT.test(new URL(link).hostname); } catch { return false; } };
+  const validLink = (link) => { try { const u = new URL(link); return ["http:", "https:"].includes(u.protocol) && !!u.hostname && link.length <= 300; } catch { return false; } };
+  const linkHost = (link) => { try { return new URL(link).hostname.replace(/^www\./, ""); } catch { return link; } };
+
   S.start = async () => {
-    const clips = []; // { key, file, url, progress, upload, error }
+    const clips = []; // { key, file, url, progress, upload, error }: raw footage
+    const refClips = []; // same shape: reference clips (kind "ref")
+    const links = []; // reference links
     let busy = false;
 
     return {
       tabs: ui.tabbar("client", "home"),
       html: `<div class="scroll narrow">
-        ${backRow("New brief")}
+        ${backRow("New project")}
         <h1 class="large-title" style="margin-top:14px">Start with your footage</h1>
         <p class="sub" style="margin-top:6px">Add 1 to 3 short clips. Gemini watches them and writes a brief any editor can follow.</p>
         <label class="dropzone" style="margin-top:18px" id="drop">
@@ -40,8 +48,21 @@ BMT.screens = BMT.screens || {};
           <input type="file" id="files" multiple accept="video/*" style="display:none">
         </label>
         <div id="clips"></div>
+
         <div class="h3" style="margin-top:20px">What's this video for?</div>
-        <textarea class="note" id="note" maxlength="1000" placeholder="Reel for my cafe launch, fun and fast, 30 seconds" style="margin-top:10px"></textarea>
+        <textarea class="note" id="note" maxlength="1000" aria-label="What's this video for?" placeholder="Reel for my cafe launch, fun and fast, 30 seconds" style="margin-top:10px"></textarea>
+
+        <div class="row gap-8" style="margin-top:22px;align-items:baseline"><h2 class="h3">References</h2><span class="cap">optional</span></div>
+        <p class="sub" style="margin-top:4px">Show the style you want: a trend, a video you love, an editor's work. Gemini watches YouTube links and clips.</p>
+        <form class="ref-add" id="ref-form" style="margin-top:10px">
+          <input type="url" id="ref-link" inputmode="url" autocomplete="off" aria-label="Reference link" placeholder="Paste a YouTube or Instagram link">
+          <button class="btn secondary sm" type="submit">Add</button>
+        </form>
+        <div id="links"></div>
+        <label class="ref-clip-btn" id="ref-drop">${icon("upload", 16, C.ink2, 2)}<span>Or upload a reference clip</span>
+          <input type="file" id="ref-files" accept="video/*" style="display:none"></label>
+        <div id="ref-clips"></div>
+
         <div id="status"></div>
         <button class="btn primary" id="go" style="margin-top:16px" disabled>Write my brief</button>
         <div class="ai-label" style="justify-content:center">${icon("sparkle", 14, C.cut)} Written by Gemini · you can edit it before ordering</div>
@@ -49,14 +70,16 @@ BMT.screens = BMT.screens || {};
       mount(root) {
         const list = root.querySelector("#clips"), go = root.querySelector("#go"), status = root.querySelector("#status");
         const drop = root.querySelector("#drop"), input = root.querySelector("#files");
+        const linkList = root.querySelector("#links"), linkIn = root.querySelector("#ref-link"), form = root.querySelector("#ref-form");
+        const refList = root.querySelector("#ref-clips"), refDrop = root.querySelector("#ref-drop"), refInput = root.querySelector("#ref-files");
         let stopProgress = null;
 
-        const ready = () => clips.filter((c) => c.upload);
-        const canGo = () => !busy && ready().length > 0 && clips.every((c) => c.upload || c.error);
-        const paint = () => {
-          list.innerHTML = clips.map((c) => `
+        const ready = (arr) => arr.filter((c) => c.upload);
+        const settled = (arr) => arr.every((c) => c.upload || c.error);
+        const canGo = () => !busy && ready(clips).length > 0 && settled(clips) && settled(refClips);
+        const clipRows = (arr) => arr.map((c) => `
             <div class="clip-row">
-              <video src="${c.url}" muted preload="metadata" playsinline></video>
+              <video src="${c.url}" muted preload="metadata" playsinline aria-hidden="true"></video>
               <div class="flex-1" style="min-width:0">
                 <div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.file.name)}</div>
                 <div class="cap" style="${c.error ? "color:var(--cut-ink)" : ""}">${c.error ? esc(c.error) : c.upload ? mb(c.file.size) + " · uploaded" : mb(c.file.size) + " · uploading " + Math.round(c.progress * 100) + "%"}</div>
@@ -64,45 +87,77 @@ BMT.screens = BMT.screens || {};
               </div>
               <button class="icon-btn gray" data-remove="${c.key}" aria-label="Remove ${esc(c.file.name)}" ${busy ? "disabled" : ""}>${icon("x", 14, C.sub, 2.4)}</button>
             </div>`).join("");
-          list.querySelectorAll("[data-remove]").forEach((b) => b.addEventListener("click", (ev) => {
-            ev.preventDefault();
-            const i = clips.findIndex((c) => String(c.key) === b.dataset.remove);
-            if (i >= 0) { URL.revokeObjectURL(clips[i].url); clips.splice(i, 1); paint(); }
-          }));
+        const wireRemove = (el, arr) => el.querySelectorAll("[data-remove]").forEach((b) => b.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          const i = arr.findIndex((c) => String(c.key) === b.dataset.remove);
+          if (i >= 0) { URL.revokeObjectURL(arr[i].url); arr.splice(i, 1); paint(); }
+        }));
+        const paint = () => {
+          list.innerHTML = clipRows(clips); wireRemove(list, clips);
+          refList.innerHTML = clipRows(refClips); wireRemove(refList, refClips);
+          linkList.innerHTML = links.map((l, i) => `
+            <div class="ref-link">
+              <div class="icon-tile" style="width:32px;height:32px;background:var(--grouped)">${isYouTube(l) ? ui.yt(18) : icon("share", 16, C.ink2, 2)}</div>
+              <div class="flex-1" style="min-width:0"><div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(linkHost(l))}</div>
+                <div class="cap">${isYouTube(l) ? "Gemini will watch this" : "Shared with your editor as a link"}</div></div>
+              <button class="icon-btn gray" data-unlink="${i}" aria-label="Remove link ${esc(linkHost(l))}" ${busy ? "disabled" : ""}>${icon("x", 14, C.sub, 2.4)}</button>
+            </div>`).join("");
+          linkList.querySelectorAll("[data-unlink]").forEach((b) => b.addEventListener("click", () => { links.splice(+b.dataset.unlink, 1); paint(); }));
           go.disabled = !canGo();
           drop.style.display = clips.length >= MAX_CLIPS || busy ? "none" : "";
+          refDrop.style.display = refClips.length >= MAX_REF_CLIPS || busy ? "none" : "";
+          form.style.display = links.length >= MAX_LINKS || busy ? "none" : "";
         };
 
-        const upload = async (clip) => {
+        const upload = async (clip, kind) => {
           try {
-            clip.upload = await api.uploadFile(clip.file, "raw", (p) => { clip.progress = p; paint(); });
+            clip.upload = await api.uploadFile(clip.file, kind, (p) => { clip.progress = p; paint(); });
             BMT.a11y.announce(clip.file.name + " uploaded");
           } catch (err) {
             clip.error = err.message;
           }
           paint();
         };
-
-        input.addEventListener("change", () => {
-          const room = MAX_CLIPS - clips.length;
-          const picked = [...input.files];
-          if (picked.length > room) toast(`Up to ${MAX_CLIPS} clips. Added the first ${room}.`);
+        const addFiles = (inputEl, arr, max, kind, what) => {
+          const room = max - arr.length;
+          const picked = [...inputEl.files];
+          if (picked.length > room) toast(`Up to ${max} ${what}. Added the first ${room}.`);
           picked.slice(0, room).forEach((file, i) => {
             const clip = { key: Date.now() + i, file, url: URL.createObjectURL(file), progress: 0, upload: null, error: null };
-            clips.push(clip);
-            upload(clip);
+            arr.push(clip);
+            upload(clip, kind);
           });
-          input.value = "";
+          inputEl.value = "";
           paint();
-        });
+        };
+        input.addEventListener("change", () => addFiles(input, clips, MAX_CLIPS, "raw", "clips"));
+        refInput.addEventListener("change", () => addFiles(refInput, refClips, MAX_REF_CLIPS, "ref", "reference clips"));
+
+        // Adds the typed link. Returns false (and says why) if it isn't a usable link.
+        const addLink = () => {
+          const link = linkIn.value.trim();
+          if (!link) return true;
+          if (!validLink(link)) { toast("Paste a full link, starting with https://"); linkIn.focus(); return false; }
+          if (!links.includes(link) && links.length < MAX_LINKS) links.push(link);
+          linkIn.value = "";
+          paint();
+          BMT.a11y.announce("Reference added");
+          return true;
+        };
+        form.addEventListener("submit", (ev) => { ev.preventDefault(); addLink(); });
 
         const write = async () => {
+          if (!addLink()) return; // a link typed but not added yet still counts
           busy = true; paint();
           go.textContent = "Writing your brief…";
           status.innerHTML = `<div class="card-ink" style="margin-top:16px" id="wait"></div>`;
-          stopProgress = aiProgress(status.querySelector("#wait"), ["Watching your clips…", "Finding the best moments…", "Writing the brief…"]);
+          const hasRefs = links.length || ready(refClips).length;
+          stopProgress = aiProgress(status.querySelector("#wait"), ["Watching your clips…", ...(hasRefs ? ["Studying your references…"] : []), "Finding the best moments…", "Writing the brief…"]);
           try {
-            const brief = await api.createBrief({ uploadIds: ready().map((c) => c.upload.id), note: root.querySelector("#note").value.trim() });
+            const brief = await api.createBrief({
+              uploadIds: ready(clips).map((c) => c.upload.id), note: root.querySelector("#note").value.trim(),
+              referenceUploadIds: ready(refClips).map((c) => c.upload.id), referenceLinks: links,
+            });
             stopProgress();
             api.setActiveBrief(brief);
             location.hash = "#/brief/" + brief.id;
@@ -148,6 +203,7 @@ BMT.screens = BMT.screens || {};
                 <div class="flex-1"><div style="font-size:15px;line-height:20px">${esc(m.why)}</div><div class="cap">Clip ${clipNo(m.upload_id)}</div></div></div>`).join("") || `<div class="foot">No standout moments found.</div>`}
           </div>
           <div class="sec"><div class="label">Style</div><div style="font-size:15px;line-height:21px" contenteditable="true" data-f="style_notes">${esc(r.style_notes)}</div></div>
+          ${ui.referencesSec(r.references, brief.reference_links, (brief.reference_upload_ids || []).length)}
           <div class="sec"><div class="label">Must include</div><ul>${listItems(r.must_include, "must_include", "check")}</ul></div>
           ${r.questions_for_client.length ? `<div class="sec"><div class="label">Questions for you</div><ul>${listItems(r.questions_for_client, "questions_for_client", "chat")}</ul></div>` : ""}
           <div class="sec card-gray"><div class="label">Recommended package</div>

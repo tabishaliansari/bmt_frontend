@@ -127,7 +127,7 @@ window.BMT = window.BMT || {};
     status: STATUS[o.status], serverStatus: o.status, revisionsLeft: o.revisions_left,
     notes: o.client_notes.map((n) => ({ t: n.t, who: "you", text: n.text })),
     briefId: o.brief_id, brief: o.brief, review: o.review, payout: o.payout, cutUploadId: o.cut_upload_id,
-    thumbnailUploadId: o.thumbnail_upload_id, payment: o.payment,
+    thumbnailUploadId: o.thumbnail_upload_id, payment: o.payment, referenceLinks: o.reference_links || [],
     deliveredAt: eventTime(o, "review"), approvedAt: eventTime(o, "approved"),
     acceptedAt: codeTime(o, "accepted"), declinedAt: codeTime(o, "declined"),
     changesRequested: o.timeline.some((t) => t.code === "changes"),
@@ -498,7 +498,9 @@ window.BMT = window.BMT || {};
     deliverJob: async (id, cutUploadId) => toOrder(await http(`/editor/orders/${enc(id)}/deliver`, json("POST", { cut_upload_id: cutUploadId }))),
 
     /** Briefs keep the backend shape: { id, upload_ids, client_note, result } */
-    createBrief: ({ uploadIds, note }) => http("/briefs", json("POST", { upload_ids: uploadIds, client_note: note || "" })),
+    createBrief: ({ uploadIds, note, referenceUploadIds = [], referenceLinks = [] }) => http("/briefs", json("POST", {
+      upload_ids: uploadIds, client_note: note || "", reference_upload_ids: referenceUploadIds, reference_links: referenceLinks,
+    })),
     getBrief: (id) => orNull(http(`/briefs/${enc(id)}`)),
     updateBrief: (id, result) => http(`/briefs/${enc(id)}`, json("PUT", { result })),
   };
@@ -603,12 +605,16 @@ window.BMT = window.BMT || {};
       return briefs[briefId];
     },
 
-    async createBrief({ uploadIds, note }) {
+    async createBrief({ uploadIds, note, referenceUploadIds = [], referenceLinks = [] }) {
       await delay(3000);
       const briefs = store.get("briefs", {});
       const id = "br_mock" + (Object.keys(briefs).length + 1);
-      const result = { ...structuredClone(MOCK_BRIEF), best_moments: MOCK_BRIEF.best_moments.map((m) => ({ ...m, upload_id: uploadIds[0] })) };
-      briefs[id] = { id, upload_ids: uploadIds, client_note: note || "", result };
+      const references = Array.from({ length: referenceUploadIds.length + referenceLinks.length }, (_, i) => ({
+        source: "Reference " + (i + 1), takeaway: "Quick cuts on the beat, bold white captions and a warm golden grade.",
+        apply: "Cut the latte-art pour on the beat drop and caption it in the same bold style.",
+      }));
+      const result = { ...structuredClone(MOCK_BRIEF), references, best_moments: MOCK_BRIEF.best_moments.map((m) => ({ ...m, upload_id: uploadIds[0] })) };
+      briefs[id] = { id, upload_ids: uploadIds, client_note: note || "", reference_upload_ids: referenceUploadIds, reference_links: referenceLinks, result };
       store.set("briefs", briefs);
       return briefs[id];
     },
