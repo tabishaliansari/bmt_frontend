@@ -108,6 +108,12 @@ window.BMT = window.BMT || {};
     const el = document.createElement("div");
     el.className = "screen" + (view.dark ? " dark" : "") + (direction ? " " + direction : "");
     el.innerHTML = view.html + (view.tabs || "");
+    // Footer at the end of the content (light screens only; the dark review player has none).
+    const scrollArea = el.querySelector(".scroll");
+    if (!view.dark && !view.noFooter) {
+      if (scrollArea) scrollArea.insertAdjacentHTML("beforeend", BMT.ui.footer());
+      else if (fn === S.welcome) el.insertAdjacentHTML("beforeend", BMT.ui.footerLine());
+    }
     host.replaceChildren(el);
 
     // status bar colour follows the screen

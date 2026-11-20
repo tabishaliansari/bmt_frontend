@@ -477,3 +477,11 @@ body.T-dark .ai-nano,   .screen.dark .ai-nano,   .card-ink .ai-nano   { backgrou
 .ai-trail-row:last-child { border-bottom: 0; }
 .ai-trail-row .ai-badge { min-width: 104px; justify-content: center; }
 .ai-trail-row.todo { color: var(--sub); }
+
+/* ---------- Footer ---------- */
+.app-footer { margin: 40px -16px 0; padding: 20px 16px 8px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+.app-footer .cap { line-height: 17px; }
+.app-footer .foot-built { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.app-footer p { margin: 0; }
+.app-footer-line { position: absolute; left: 24px; right: 24px; bottom: calc(12px + var(--safe-bottom)); text-align: center; font-size: 11px; line-height: 15px; }
+body.L-frame .app-footer-line { bottom: 22px; } /* clear the home indicator */

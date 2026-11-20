@@ -216,6 +216,18 @@ window.BMT = window.BMT || {};
   /** A row of badges: aiBadges(["gemini", "wrote this brief"], ["gemma", "checked your note"]) */
   const aiBadges = (...items) => `<div class="ai-badges">${items.filter(Boolean).map(([m, a]) => aiBadge(m, a)).join("")}</div>`;
 
+  // ---------------------------------------------------------------- footer
+  /** Full footer, appended to the end of each light screen's scroll area (see app.js). */
+  const footer = () => `
+    <footer class="app-footer">
+      <div class="row gap-8">${logo(22)}<b style="font-size:15px">BMT</b><span class="cap">Videos, edited. By people with proof.</span></div>
+      <div class="foot-built"><span class="cap">Built with</span>${aiBadge("gemini")}${aiBadge("gemma")}${aiBadge("nano")}<span class="cap">on Google Cloud</span></div>
+      <p class="cap">Demo: payments, escrow and Ramp payouts are simulated. No real money moves.</p>
+      <p class="cap">Google Startup Buildathon India 2026 · Pune · © 2026 BMT</p>
+    </footer>`;
+  /** One line for screens without a scroll area (welcome). */
+  const footerLine = () => `<footer class="app-footer-line cap">Built with Gemini, Gemma and Nano Banana on Google Cloud · Payments are simulated</footer>`;
+
   /** Gemini's notes on the client's references. Labels run clips first, then links. */
   function referencesSec(refs, links = [], clipCount = 0, heading = "Inspired by your references") {
     if (!refs || !refs.length) return "";
@@ -260,5 +272,5 @@ window.BMT = window.BMT || {};
   /** A loading placeholder shaped like the screen that's coming: grid | detail | list | order | doc */
   const skeleton = (kind) => `<div aria-busy="true" aria-label="Loading">${(SKELETONS[kind] || SKELETONS.list)()}</div>`;
 
-  BMT.ui = { C, G, icon, seal, yt, logo, av, thumb, playBadge, chip, rating, tagChip, inr, usd, esc, aiProgress, compact, tabbar, sidebar, toast, sheet, onLongPress, peek, statusBar, isDesktop, skeleton, referencesSec, aiBadge, aiBadges };
+  BMT.ui = { C, G, icon, seal, yt, logo, av, thumb, playBadge, chip, rating, tagChip, inr, usd, esc, aiProgress, compact, tabbar, sidebar, toast, sheet, onLongPress, peek, statusBar, isDesktop, skeleton, referencesSec, aiBadge, aiBadges, footer, footerLine };
 })();
