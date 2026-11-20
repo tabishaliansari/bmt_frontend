@@ -395,7 +395,8 @@ body.L-desk .job-media { grid-template-columns: 1fr 1fr; }
 .tour { position: fixed; inset: 0; z-index: 3000; opacity: 0; transition: opacity .2s; }
 .tour.on { opacity: 1; }
 .tour-block { position: fixed; inset: 0; } /* transparent: blocks clicks on the page underneath */
-.tour-dim { position: fixed; background: rgba(0,0,0,.6); pointer-events: none; }
+.tour-dim { position: fixed; background: rgba(0,0,0,.6); pointer-events: none;
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); } /* blur everything except the spotlight */
 .tour-spot { position: fixed; border-radius: 14px; outline: 2px solid var(--cut); outline-offset: 2px; pointer-events: none; }
 .tour-card { position: fixed; background: var(--sheet); color: var(--ink); border-radius: var(--r-lg); padding: 16px; box-shadow: 0 12px 32px rgba(0,0,0,.28); font-family: var(--font); transition: top .25s var(--ease), left .25s var(--ease); }
 .tour-count { font-size: 12px; font-weight: 600; color: var(--cut); }
