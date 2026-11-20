@@ -56,6 +56,24 @@ window.BMT = window.BMT || {};
     side.querySelector(".sb-switch").addEventListener("click", (e) => S.enterRole(e.currentTarget.dataset.mode));
   }
 
+  // ---- skeleton loading: which placeholder shape fits each screen
+  const SKELETON_DELAY_MS = 120; // fast loads never flash a skeleton
+  const SKELETON_ROUTES = [
+    [/^\/brief\/[\w-]+\/editors$/, "grid"], [/^\/(discover|search|favs)$/, "grid"],
+    [/^\/editor\/[\w-]+$/, "detail"],
+    [/^\/(orders|studio|studio-orders)$/, "list"],
+    [/^\/(order|job|review)\/[\w-]+$/, "order"],
+    [/^\/brief\/[\w-]+$/, "doc"],
+  ];
+  const skeletonFor = (path) => (SKELETON_ROUTES.find(([re]) => re.test(path)) || [])[1] || null;
+  function showSkeleton(kind, path) {
+    const st = navState(path);
+    const el = document.createElement("div");
+    el.className = "screen";
+    el.innerHTML = BMT.ui.skeleton(kind) + (st ? BMT.ui.tabbar(st.mode, st.active) : "");
+    host.replaceChildren(el);
+  }
+
   let renderSeq = 0;
   async function render(direction) {
     const seq = ++renderSeq;
@@ -74,11 +92,16 @@ window.BMT = window.BMT || {};
     renderNav(path);
     // Private screens (your footage, briefs, orders) need Google sign-in first.
     if (PRIVATE_ROUTES.test(path) && BMT.api.needsSignIn()) fn = S.signIn;
+    // If the screen takes a moment (it's fetching data), show a skeleton shaped like it.
+    const kind = fn === S.signIn ? null : skeletonFor(path);
+    const skTimer = kind && setTimeout(() => { if (seq === renderSeq) showSkeleton(kind, path); }, SKELETON_DELAY_MS);
     let view;
     try {
       view = await fn(match || [], query);
     } catch (err) {
       view = await S.loadError(err);
+    } finally {
+      clearTimeout(skTimer);
     }
     // A newer navigation started while this screen was loading: drop this one.
     if (seq !== renderSeq) return;

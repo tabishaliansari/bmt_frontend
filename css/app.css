@@ -406,3 +406,10 @@ body.L-desk .job-media { grid-template-columns: 1fr 1fr; }
 .tour-back { font-size: 15px; font-weight: 600; padding: 8px 12px; border-radius: 10px; background: var(--grouped); color: var(--ink); }
 .tour-next { font-size: 15px; font-weight: 600; padding: 8px 14px; border-radius: 10px; background: var(--ink); color: var(--on-ink); }
 .tour-back[hidden] { display: none; }
+
+/* ---------- Skeleton loading ---------- */
+.sk { position: relative; overflow: hidden; background: var(--grouped); }
+.sk::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--line), transparent); animation: sk-shimmer 1.3s ease-in-out infinite; }
+@keyframes sk-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .sk::after { animation: none; } }

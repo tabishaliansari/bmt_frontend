@@ -197,5 +197,30 @@ window.BMT = window.BMT || {};
 
   const isDesktop = () => document.body.classList.contains("L-desk");
 
-  BMT.ui = { C, G, icon, seal, yt, logo, av, thumb, playBadge, chip, rating, tagChip, inr, usd, esc, aiProgress, compact, tabbar, sidebar, toast, sheet, onLongPress, peek, statusBar, isDesktop };
+  // ------------------------------------------------------------ skeletons (shown while a screen loads)
+  // Shapes mirror the real screens so content lands where the placeholder was.
+  const bone = (w, h, r = 8, extra = "") => `<div class="sk" style="width:${w};height:${h}px;border-radius:${r}px;${extra}"></div>`;
+  const skRow = () => `<div class="row gap-12" style="padding:12px 0">${bone("56px", 56, 12)}<div class="flex-1">${bone("60%", 14)}${bone("40%", 12, 6, "margin-top:8px")}</div>${bone("54px", 14)}</div>`;
+  const skCard = () => `<div style="margin-top:14px">${bone("100%", 188, 16)}<div class="row gap-10" style="margin-top:10px">${bone("36px", 36, 18)}<div class="flex-1">${bone("55%", 14)}${bone("75%", 12, 6, "margin-top:6px")}</div></div></div>`;
+  const SKELETONS = {
+    grid: () => `<div class="scroll">${bone("120px", 12)}${bone("200px", 34, 10, "margin-top:8px")}${bone("100%", 44, 12, "margin-top:14px")}
+      ${bone("100%", 72, 22, "margin-top:16px")}${bone("180px", 20, 8, "margin-top:22px")}
+      <div class="row gap-12" style="margin-top:12px">${Array.from({ length: 5 }, () => bone("62px", 62, 31)).join("")}</div>
+      <div class="ed-grid">${Array.from({ length: 6 }, skCard).join("")}</div></div>`,
+    detail: () => `<div class="scroll" style="padding:0">${bone("100%", 250, 0)}<div style="padding:0 16px">
+      ${bone("76px", 76, 38, "margin-top:-36px;border:3px solid var(--canvas)")}${bone("50%", 22, 8, "margin-top:12px")}${bone("70%", 14, 6, "margin-top:8px")}
+      <div class="row gap-12" style="margin-top:18px">${Array.from({ length: 3 }, () => `<div class="flex-1">${bone("60%", 20, 6, "margin:0 auto")}${bone("80%", 10, 5, "margin:6px auto 0")}</div>`).join("")}</div>
+      ${Array.from({ length: 3 }, () => `<div class="row gap-12" style="padding:16px 0;border-bottom:1px solid var(--line)"><div class="flex-1">${bone("45%", 16)}${bone("30%", 14, 6, "margin-top:8px")}${bone("85%", 12, 6, "margin-top:10px")}</div>${bone("112px", 104, 14)}</div>`).join("")}
+      </div></div>`,
+    list: () => `<div class="scroll narrow">${bone("160px", 34, 10, "margin-top:6px")}<div style="margin-top:12px">${Array.from({ length: 5 }, skRow).join("")}</div></div>`,
+    order: () => `<div class="scroll narrow">${bone("60%", 20, 8, "margin:6px auto 0")}${bone("100%", 170, 22, "margin-top:16px")}
+      ${bone("100%", 66, 16, "margin-top:14px")}${Array.from({ length: 5 }, () => `<div class="row gap-12" style="margin-top:16px">${bone("22px", 22, 11)}${bone("55%", 14)}</div>`).join("")}</div>`,
+    doc: () => `<div class="scroll narrow">${bone("40%", 20, 8, "margin:6px auto 0")}<div class="brief-doc">${bone("70%", 28, 8)}
+      <div class="row gap-8" style="margin-top:10px">${bone("70px", 22, 11)}${bone("70px", 22, 11)}</div>${bone("100%", 60, 14, "margin-top:20px")}
+      ${Array.from({ length: 4 }, () => bone("100%", 14, 6, "margin-top:14px")).join("")}</div></div>`,
+  };
+  /** A loading placeholder shaped like the screen that's coming: grid | detail | list | order | doc */
+  const skeleton = (kind) => `<div aria-busy="true" aria-label="Loading">${(SKELETONS[kind] || SKELETONS.list)()}</div>`;
+
+  BMT.ui = { C, G, icon, seal, yt, logo, av, thumb, playBadge, chip, rating, tagChip, inr, usd, esc, aiProgress, compact, tabbar, sidebar, toast, sheet, onLongPress, peek, statusBar, isDesktop, skeleton };
 })();
