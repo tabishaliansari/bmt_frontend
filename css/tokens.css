@@ -23,14 +23,17 @@
   /* Accent (<10%): the playhead. Action + creative moments only. */
   --cut: #FF5A1F;
   --cut-tint: #FFF0E8;
+  --cut-ink: #C43D0A;      /* accent as TEXT: 4.5:1 on white and on --cut-tint (WCAG AA) */
+  --focus: #C43D0A;        /* keyboard focus ring */
 
   /* Semantic: one colour, one meaning */
   --trust: #0A84FF;        /* verified, only */
   --trust-tint: #E8F2FF;
+  --trust-ink: #0062CC;    /* verified, as text (AA contrast) */
   --safe: #1E9E5A;         /* money held safely, ratings */
   --safe-tint: #E7F6EE;
   --safe-ink: #16683F;
-  --rating-bg: #1E9E5A;
+  --rating-bg: #16803F;    /* white text on it passes AA */
   --star: #FFB020;
   --switch: #34C759;
 
@@ -82,7 +85,10 @@ body.T-dark {
 
   --cut: #FF6A2E;
   --cut-tint: rgba(255,106,46,.16);
+  --cut-ink: #FF8A5C;
+  --focus: #FF8A5C;
   --trust: #0A84FF;
+  --trust-ink: #5AA9FF;
   --trust-tint: rgba(10,132,255,.18);
   --safe: #30C46B;
   --safe-tint: rgba(48,196,107,.15);
@@ -90,3 +96,22 @@ body.T-dark {
 }
 /* Cards inside sheets sit one step lighter, like iOS */
 body.T-dark .sheet { --grouped: #2C2C2E; --line: #38383A; --raised: #3A3A3C; }
+
+/* ------------------------------------------------------------------
+   Accessibility settings (You → Accessibility; js/a11y.js sets the classes)
+   ------------------------------------------------------------------ */
+body.A-contrast {
+  --sub: #3A3A3C; --ter: #6E6E73; --line: #8E8E93;
+  --cut: #C43D0A; --cut-ink: #A33208; --trust: #0062CC; --safe: #16683F;
+}
+body.T-dark.A-contrast {
+  --sub: #E5E5EA; --ter: #AEAEB2; --line: #8E8E93;
+  --cut: #FF8A5C; --cut-ink: #FFA27E; --trust: #5AA9FF; --safe: #4FD98A;
+  --on-ink: #000000;
+}
+body.A-font {
+  --font: "Atkinson Hyperlegible", var(--font-fallback, -apple-system, "Segoe UI", Roboto, sans-serif);
+  --font-display: "Atkinson Hyperlegible", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-rounded: "Atkinson Hyperlegible", -apple-system, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: 0;
+}

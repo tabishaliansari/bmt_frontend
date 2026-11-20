@@ -303,6 +303,13 @@ window.BMT = window.BMT || {};
       { timestamp_sec: 12, issue: "Captions disappear", suggestion: "Keep captions through 0:12–0:18", severity: "high", source: "ai" },
       { timestamp_sec: 24, issue: "Cafe name never shown", suggestion: "Add the cafe name as a title over the closing shot", severity: "medium", source: "ai" },
     ],
+    accessibility: [
+      { check: "captions", passed: false, detail: "Speech between 0:12 and 0:18 has no captions.", timestamp_sec: 12 },
+      { check: "caption_readability", passed: true, detail: "Captions are large, bold and on screen long enough." },
+      { check: "text_contrast", passed: true, detail: "Titles sit on a dark band and are easy to read." },
+      { check: "flashing", passed: true, detail: "No rapid flashing anywhere in the cut." },
+      { check: "audio_clarity", passed: true, detail: "Voice stays clear over the music." },
+    ],
   };
   const MOCK_FX = 84.1, MOCK_FEE = 0.15;
 
@@ -360,7 +367,7 @@ window.BMT = window.BMT || {};
       session.profile = null;
       try { localStorage.removeItem("bmt:mode"); } catch {}
     },
-    /** Server profile after sign-in: { role, editor_id, onboarded } (null when signed out or in mock mode). */
+    /** Server profile after sign-in: { role, editor_id, onboarded, a11y } (null when signed out or in mock mode). */
     profile: () => session.profile,
     loadProfile,
     /** Mark a role's intro as seen (or skipped), on the account when signed in. */
@@ -368,6 +375,8 @@ window.BMT = window.BMT || {};
       store.set("intro:" + role, true);
       await saveProfile({ onboarded_role: role }).catch(() => null);
     },
+    /** Save display settings ({ large_text, high_contrast, readable_font, reduce_motion }) on the account. */
+    saveA11y: (prefs) => saveProfile({ a11y: prefs }).catch(() => null),
     hasSeenIntro: (role) => (session.profile ? !!session.profile.onboarded?.[role] : !!store.get("intro:" + role, false)),
     currentUser() {
       const u = session.user;

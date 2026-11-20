@@ -35,12 +35,12 @@ window.BMT = window.BMT || {};
     root.className = "tour";
     // Dim layer = four plain rectangles around the target: paints reliably everywhere (a giant
     // box-shadow or an SVG mask doesn't on some high-density phones). Ring drawn on top.
-    root.innerHTML = `<div class="tour-block"></div>
-      <div class="tour-dim" data-side="top"></div><div class="tour-dim" data-side="bottom"></div>
-      <div class="tour-dim" data-side="left"></div><div class="tour-dim" data-side="right"></div>
-      <div class="tour-spot"></div>
-      <div class="tour-card" role="dialog" aria-modal="true" aria-live="polite">
-        <div class="tour-count"></div><div class="tour-title"></div><div class="tour-text"></div>
+    root.innerHTML = `<div class="tour-block" aria-hidden="true"></div>
+      <div class="tour-dim" data-side="top" aria-hidden="true"></div><div class="tour-dim" data-side="bottom" aria-hidden="true"></div>
+      <div class="tour-dim" data-side="left" aria-hidden="true"></div><div class="tour-dim" data-side="right" aria-hidden="true"></div>
+      <div class="tour-spot" aria-hidden="true"></div>
+      <div class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-text">
+        <div class="tour-count"></div><div class="tour-title" id="tour-title" aria-live="polite"></div><div class="tour-text" id="tour-text"></div>
         <div class="tour-actions"><button class="tour-skip"></button><span style="flex:1"></span>
           <button class="tour-back">Back</button><button class="tour-next"></button></div>
       </div>`;
@@ -108,7 +108,9 @@ window.BMT = window.BMT || {};
     addEventListener("resize", schedule);
     document.addEventListener("scroll", schedule, true);
     document.addEventListener("keydown", onKey);
+    const release = BMT.a11y ? BMT.a11y.trap(card, root.querySelector(".tour-next")) : () => {};
     active = { root, cleanup: () => {
+      release();
       removeEventListener("resize", schedule);
       document.removeEventListener("scroll", schedule, true);
       document.removeEventListener("keydown", onKey);

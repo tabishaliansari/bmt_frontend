@@ -59,8 +59,8 @@ BMT.screens = BMT.screens || {};
               <video src="${c.url}" muted preload="metadata" playsinline></video>
               <div class="flex-1" style="min-width:0">
                 <div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.file.name)}</div>
-                <div class="cap" style="${c.error ? "color:var(--cut)" : ""}">${c.error ? esc(c.error) : c.upload ? mb(c.file.size) + " · uploaded" : mb(c.file.size) + " · uploading " + Math.round(c.progress * 100) + "%"}</div>
-                ${c.upload || c.error ? "" : `<div class="progress"><div style="width:${Math.round(c.progress * 100)}%"></div></div>`}
+                <div class="cap" style="${c.error ? "color:var(--cut-ink)" : ""}">${c.error ? esc(c.error) : c.upload ? mb(c.file.size) + " · uploaded" : mb(c.file.size) + " · uploading " + Math.round(c.progress * 100) + "%"}</div>
+                ${c.upload || c.error ? "" : `<div class="progress" role="progressbar" aria-label="Uploading ${esc(c.file.name)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(c.progress * 100)}"><div style="width:${Math.round(c.progress * 100)}%"></div></div>`}
               </div>
               <button class="icon-btn gray" data-remove="${c.key}" aria-label="Remove ${esc(c.file.name)}" ${busy ? "disabled" : ""}>${icon("x", 14, C.sub, 2.4)}</button>
             </div>`).join("");
@@ -76,6 +76,7 @@ BMT.screens = BMT.screens || {};
         const upload = async (clip) => {
           try {
             clip.upload = await api.uploadFile(clip.file, "raw", (p) => { clip.progress = p; paint(); });
+            BMT.a11y.announce(clip.file.name + " uploaded");
           } catch (err) {
             clip.error = err.message;
           }

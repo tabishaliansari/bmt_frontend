@@ -54,6 +54,7 @@ window.BMT = window.BMT || {};
     send: '<path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/>',
     swap: '<path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>',
     plusc: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+    access: '<circle cx="12" cy="4.5" r="1.8"/><path d="M5 8.5l7 1.5 7-1.5M12 10v5M9 21l3-6 3 6"/>',
     gift: '<rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13M3 12h18M12 8S10.5 3 8 4s.5 4 4 4zM12 8s1.5-5 4-4-.5 4-4 4z"/>',
   };
   const FILLED = {
@@ -70,9 +71,9 @@ window.BMT = window.BMT || {};
 
   const seal = (size = 16, attrs = "") =>
     `<svg ${attrs} width="${size}" height="${size}" viewBox="0 0 24 24" role="img" aria-label="Verified"><path style="fill:${C.trust}" d="${SEAL}"/><path d="m8 12.3 2.8 2.8L16.2 9.6" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const yt = (size = 18) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" aria-label="YouTube"><rect x="2" y="5" width="20" height="14" rx="4" fill="#FF0033"/><path d="M10 9v6l5-3z" fill="#fff"/></svg>`;
+  const yt = (size = 18) => `<svg width="${size}" height="${size}" viewBox="0 0 24 24" role="img" aria-label="YouTube"><rect x="2" y="5" width="20" height="14" rx="4" fill="#FF0033"/><path d="M10 9v6l5-3z" fill="#fff"/></svg>`;
   const logo = (size = 28, tile = "var(--hero)") =>
-    `<svg width="${size}" height="${size}" viewBox="0 0 32 32" aria-label="BMT"><rect width="32" height="32" rx="9" style="fill:${tile}"/><path d="M11.5 8h9l-4.5 5z" style="fill:${C.cut}"/><rect x="15" y="12" width="2" height="13" rx="1" style="fill:${C.cut}"/></svg>`;
+    `<svg width="${size}" height="${size}" viewBox="0 0 32 32" role="img" aria-label="BMT"><rect width="32" height="32" rx="9" style="fill:${tile}"/><path d="M11.5 8h9l-4.5 5z" style="fill:${C.cut}"/><rect x="15" y="12" width="2" height="13" rx="1" style="fill:${C.cut}"/></svg>`;
 
   const av = (initials, i = 0, size = 36, ring = false) =>
     `<div class="avatar" style="width:${size}px;height:${size}px;background:${AV[i % AV.length]};font-size:${Math.round(size * 0.38)}px;${ring ? "box-shadow:0 0 0 3px var(--canvas);" : ""}">${initials}</div>`;
@@ -82,7 +83,7 @@ window.BMT = window.BMT || {};
   const playBadge = (size = 15) => `<div class="play-badge"><div>${icon("play", size, "#fff")}</div></div>`;
 
   const chip = (text, cls = "", ic = "") => `<span class="chip ${cls}">${ic}${text}</span>`;
-  const rating = (v, n) => `<span class="chip rating">${icon("star", 11, "#fff")}${v}${n ? ` <span style="font-weight:500;opacity:.85">(${n})</span>` : ""}</span>`;
+  const rating = (v, n) => `<span class="chip rating">${icon("star", 11, "#fff")}${v}${n ? ` <span style="font-weight:500">(${n})</span>` : ""}</span>`;
   const tagChip = (tag) => tag === "best" ? chip("Bestseller", "best", icon("bolt", 11, C.cut, 2.2)) : tag === "try" ? chip("Try first", "try") : "";
 
   const inr = (n) => "₹" + Number(n).toLocaleString("en-IN");
@@ -93,6 +94,8 @@ window.BMT = window.BMT || {};
   // Calm, honest progress line for AI steps: cycles through messages, no fake percentages.
   function aiProgress(el, lines, ms = 2600) {
     let i = 0;
+    el.setAttribute("role", "status"); // screen readers hear each step as it changes
+    el.setAttribute("aria-live", "polite");
     const paint = () => (el.innerHTML = `<div class="ai-wait"><span class="ai-dot"></span><span>${lines[i % lines.length]}</span></div>`);
     paint();
     const t = setInterval(() => { i++; paint(); }, ms);
@@ -105,17 +108,17 @@ window.BMT = window.BMT || {};
     editor: [["studio", "Studio", "#/studio"], ["orders", "Orders", "#/studio-orders"], ["users", "Community", "#/community"], ["book", "Learn", "#/learn"], ["user", "Profile", "#/me"]],
   };
   const tabbar = (mode, active) =>
-    `<nav class="tabbar">${TABS[mode].map(([ic, label, href]) => {
+    `<nav class="tabbar" aria-label="Main">${TABS[mode].map(([ic, label, href]) => {
       const on = ic === active;
-      return `<a href="${href}" class="${on ? "on" : ""}">${icon(ic, 25, on ? C.cut : C.tab, 1.9)}<span>${label}</span></a>`;
+      return `<a href="${href}" class="${on ? "on" : ""}"${on ? ' aria-current="page"' : ""}>${icon(ic, 25, on ? C.cut : C.tab, 1.9)}<span>${label}</span></a>`;
     }).join("")}</nav>`;
 
   // Desktop sidebar: same destinations as the tab bar, laid out vertically.
   const sidebar = (mode, active) => `
-    <a href="#/" class="sb-brand">${logo(32)}<span>BMT</span></a>
-    <nav class="sb-nav">${TABS[mode].map(([ic, label, href]) => {
+    <a href="#/" class="sb-brand" aria-label="BMT home">${logo(32)}<span aria-hidden="true">BMT</span></a>
+    <nav class="sb-nav" aria-label="Main">${TABS[mode].map(([ic, label, href]) => {
       const on = ic === active;
-      return `<a href="${href}" class="${on ? "on" : ""}">${icon(ic, 22, on ? C.cut : C.ink2, 1.9)}<span>${label}</span></a>`;
+      return `<a href="${href}" class="${on ? "on" : ""}"${on ? ' aria-current="page"' : ""}>${icon(ic, 22, on ? C.cut : C.ink2, 1.9)}<span>${label}</span></a>`;
     }).join("")}</nav>
     <div class="sb-foot">
       ${mode === "client"
@@ -130,7 +133,7 @@ window.BMT = window.BMT || {};
   function toast(msg, ic = "") {
     const dev = document.querySelector(".device");
     let t = dev.querySelector(".toast");
-    if (!t) { t = document.createElement("div"); t.className = "toast"; dev.appendChild(t); }
+    if (!t) { t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status"); t.setAttribute("aria-live", "polite"); dev.appendChild(t); }
     t.innerHTML = ic + msg;
     requestAnimationFrame(() => t.classList.add("show"));
     clearTimeout(toastTimer);
@@ -147,14 +150,18 @@ window.BMT = window.BMT || {};
     el.setAttribute("role", "dialog");
     el.setAttribute("aria-modal", "true");
     if (height) el.style.height = height;
-    el.innerHTML = `<div class="grabber"></div><div class="sheet-body">${body}</div>${foot ? `<div class="sheet-foot">${foot}</div>` : ""}`;
+    el.innerHTML = `<div class="grabber" aria-hidden="true"></div><div class="sheet-body">${body}</div>${foot ? `<div class="sheet-foot">${foot}</div>` : ""}`;
     dev.append(back, el);
+    const heading = el.querySelector("h1, h2, h3, .title-2, .h2, .h3");
+    if (heading) { heading.id = heading.id || "sheet-title-" + Date.now(); el.setAttribute("aria-labelledby", heading.id); }
+    const release = BMT.a11y ? BMT.a11y.trap(el) : () => {};
     requestAnimationFrame(() => { back.classList.add("open"); el.classList.add("open"); });
     const close = () => {
       back.classList.remove("open"); el.classList.remove("open");
       setTimeout(() => { back.remove(); el.remove(); }, 380);
       onClose && onClose();
       document.removeEventListener("keydown", onKey);
+      release();
     };
     const onKey = (e) => e.key === "Escape" && close();
     document.addEventListener("keydown", onKey);
@@ -189,7 +196,7 @@ window.BMT = window.BMT || {};
   }
 
   const statusBar = (light = false) => `
-    <div class="status ${light ? "light" : ""}"><span class="time">9:41</span><div class="icons">
+    <div class="status ${light ? "light" : ""}" aria-hidden="true"><span class="time">9:41</span><div class="icons">
       <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
       <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 11.5 10.4 9a3.4 3.4 0 0 0-4.8 0z" fill="currentColor"/><path d="M3.8 7.2a6 6 0 0 1 8.4 0M1.4 4.7a9.5 9.5 0 0 1 13.2 0" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
       <svg width="27" height="13" viewBox="0 0 27 13"><rect x="0.5" y="0.5" width="23" height="12" rx="3.5" stroke="currentColor" stroke-opacity=".4" fill="none"/><rect x="2" y="2" width="19" height="9" rx="2" fill="currentColor"/><rect x="24.5" y="4.5" width="1.6" height="4" rx=".8" fill="currentColor" fill-opacity=".45"/></svg>

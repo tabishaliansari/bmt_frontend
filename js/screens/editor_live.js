@@ -21,10 +21,10 @@ BMT.screens = BMT.screens || {};
 
   // [label, colour] per job state, as the editor sees it
   const jobState = (o) => {
-    if (o.serverStatus === "funded") return ["New order", C.cut];
-    if (o.serverStatus === "in_progress") return o.changesRequested ? ["Changes requested", C.cut] : ["Editing", C.trust];
-    if (o.serverStatus === "review") return ["With the client", C.trust];
-    if (o.serverStatus === "approved") return ["Paid", C.safe];
+    if (o.serverStatus === "funded") return ["New order", "var(--cut-ink)"];
+    if (o.serverStatus === "in_progress") return o.changesRequested ? ["Changes requested", "var(--cut-ink)"] : ["Editing", "var(--trust-ink)"];
+    if (o.serverStatus === "review") return ["With the client", "var(--trust-ink)"];
+    if (o.serverStatus === "approved") return ["Paid", "var(--safe-ink)"];
     return ["Declined", C.sub];
   };
 

@@ -15,7 +15,7 @@ BMT.screens = BMT.screens || {};
   // A vertical list of steps that tick one by one: [{ title, sub }]
   const stepsHTML = (steps) => `<div class="pay-steps">${steps.map((s, i) => `
     <div class="pay-step todo" data-step="${i}">
-      <span class="pay-dot"></span>
+      <span class="pay-dot" aria-hidden="true"></span>
       <div class="flex-1"><div class="pay-title">${s.title}</div>${s.sub ? `<div class="pay-sub">${s.sub}</div>` : ""}</div>
     </div>`).join("")}</div>`;
 
@@ -24,6 +24,7 @@ BMT.screens = BMT.screens || {};
     if (!row) return;
     row.className = "pay-step " + state;
     row.querySelector(".pay-dot").innerHTML = state === "done" ? icon("check", 12, "currentColor", 3) : "";
+    if (state === "live") BMT.a11y.announce(row.querySelector(".pay-title").textContent);
   }
 
   async function playSteps(root, count, ms = 650) {

@@ -118,6 +118,8 @@ window.BMT = window.BMT || {};
 
     el.querySelectorAll("[data-back]").forEach((b) => b.addEventListener("click", back));
     if (view.mount) cleanup = view.mount(el) || null;
+    // Keyboard and screen-reader users land on the new screen's heading, not the old focus.
+    if (direction) BMT.a11y.focusScreen();
 
     // "?tour=1": start the product tour on this screen once it has settled, then drop the flag
     // so a refresh doesn't restart it.

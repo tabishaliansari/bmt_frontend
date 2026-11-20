@@ -458,12 +458,42 @@ BMT.screens = BMT.screens || {};
     return `<div class="card-gray row gap-12" style="margin-top:12px">${av("TA", 1, 56)}<div class="flex-1"><div class="h3">Tabish A.</div><div class="foot">Client · Pune</div></div></div>`;
   };
 
+  // Accessibility settings: apply instantly, saved on the account (and in this browser).
+  const A11Y_SETTINGS = [
+    ["large_text", "Larger text", "Makes text and buttons about 20% bigger."],
+    ["high_contrast", "High contrast", "Darker text, stronger borders and colours."],
+    ["readable_font", "Easy-to-read font", "Atkinson Hyperlegible, designed for low vision."],
+    ["reduce_motion", "Reduce motion", "Turns off animations and slides."],
+  ];
+  function a11ySheet() {
+    const cur = BMT.a11y.get();
+    BMT.ui.sheet({
+      body: `<h2 class="title-2" style="margin-top:16px">Accessibility</h2>
+        <p class="sub" style="margin-top:4px">Saved to your account, so it follows you to every device.</p>
+        <div style="margin-top:10px">${A11Y_SETTINGS.map(([k, label, hint]) => `
+          <button class="a11y-set" role="switch" aria-checked="${!!cur[k]}" data-k="${k}">
+            <span class="flex-1"><span style="font-size:17px;display:block">${label}</span><span class="sub">${hint}</span></span>
+            <span class="switch ${cur[k] ? "on" : ""}" aria-hidden="true"></span></button>`).join("")}</div>
+        <p class="sub" style="margin-top:14px;font-size:13px">BMT also follows your device's reduced-motion setting, and works with screen readers such as TalkBack, VoiceOver and ChromeVox.</p>`,
+      foot: `<button class="btn" data-close>Done</button>`,
+      onMount(el) {
+        el.querySelectorAll("[data-k]").forEach((b) => b.addEventListener("click", () => {
+          const on = b.getAttribute("aria-checked") !== "true";
+          b.setAttribute("aria-checked", String(on));
+          b.querySelector(".switch").classList.toggle("on", on);
+          BMT.a11y.set(b.dataset.k, on);
+          BMT.a11y.announce(`${b.querySelector(".flex-1 span").textContent} ${on ? "on" : "off"}`);
+        }));
+      },
+    });
+  }
+
   S.you = async () => { const role = api.getMode() === "editor" ? "editor" : "client"; return {
     tabs: tabbar(role, "user"),
     html: `<div class="scroll"><h1 class="large-title" style="margin-top:6px">You</h1>
       ${accountCard()}
       <div style="margin-top:20px">
-        ${[...(role === "client" ? [["heart", "Favourite editors", "#/favs"], ["orders", "Order history", "#/orders"]] : []), ["shield", "How payments are protected", "escrow"], ["play", "Take the tour", "intro"], ["studio", BMT.layout.isDesktop() ? "View mobile version" : "View desktop version", "layout"], ["sparkle", "Appearance · " + ({ auto: "Automatic", light: "Light", dark: "Dark" })[BMT.theme.get()], "theme"], ["swap", role === "editor" ? "Switch to client mode" : "Switch to editor mode", "switch"], ["repeat", "Reset demo data", "reset"]].map(([ic, t, act]) => `
+        ${[...(role === "client" ? [["heart", "Favourite editors", "#/favs"], ["orders", "Order history", "#/orders"]] : []), ["shield", "How payments are protected", "escrow"], ["play", "Take the tour", "intro"], ["studio", BMT.layout.isDesktop() ? "View mobile version" : "View desktop version", "layout"], ["sparkle", "Appearance · " + ({ auto: "Automatic", light: "Light", dark: "Dark" })[BMT.theme.get()], "theme"], ["access", "Accessibility", "a11y"], ["swap", role === "editor" ? "Switch to client mode" : "Switch to editor mode", "switch"], ["repeat", "Reset demo data", "reset"]].map(([ic, t, act]) => `
           <button class="list-row" style="width:100%;text-align:left" data-act="${act}"><div class="icon-tile" style="background:var(--grouped)">${icon(ic, 18, C.ink2)}</div><span class="flex-1" style="font-size:17px">${t}</span>${icon("chev_r", 16, C.ter, 2.2)}</button>`).join("")}
       </div></div>`,
     mount(root) {
@@ -481,6 +511,7 @@ BMT.screens = BMT.screens || {};
               <div class="row gap-10" style="margin-top:16px">${[["auto", "Automatic"], ["light", "Light"], ["dark", "Dark"]].map(([k, l]) => `<button class="choice ${BMT.theme.get() === k ? "on" : ""}" data-close data-t="${k}" style="text-align:center"><span style="font-size:15px;font-weight:600">${l}</span></button>`).join("")}</div>`,
             onMount(el) { el.querySelectorAll("[data-t]").forEach((x) => x.addEventListener("click", () => { BMT.theme.set(x.dataset.t); BMT.router.refresh(); })); },
           });
+          else if (a === "a11y") a11ySheet();
           else if (a === "switch") S.enterRole(role === "editor" ? "client" : "editor");
           else if (a === "intro") location.hash = S.tourHref(role);
         else if (a === "reset") { api.resetDemo(); BMT.cart = null; location.hash = "#/"; }

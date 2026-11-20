@@ -66,12 +66,12 @@ BMT.screens = BMT.screens || {};
       ["Your review", "", o.status === "approved" ? "done" : o.status === "review" ? "live" : "todo"],
       [`Payment released to ${first(e)}`, o.status === "approved" && o.approvedAt ? time(o.approvedAt) : "", o.status === "approved" ? "done" : "todo"],
     ];
-    const stepHTML = steps.map(([t, s, st], i) => `
-      <div class="step ${st}" style="${i === steps.length - 1 ? "min-height:24px" : ""}">
-        <div class="rail"><div class="dot">${st === "done" ? icon("check", 13, "currentColor", 3) : ""}</div>${i < steps.length - 1 ? '<div class="line"></div>' : ""}</div>
-        <div class="flex-1 between" style="align-items:flex-start;padding-top:1px"><span style="font-size:15px;font-weight:${st === "live" ? 600 : 500};color:${st === "todo" ? C.sub : C.ink}">${t}</span>
-        <span style="font-size:13px;color:${st === "live" ? C.cut : C.sub};font-weight:${st === "live" ? 600 : 400}">${s}</span></div>
-      </div>`).join("");
+    const stepHTML = '<div role="list" aria-label="Order progress">' + steps.map(([t, s, st], i) => `
+      <div class="step ${st}" role="listitem" style="${i === steps.length - 1 ? "min-height:24px" : ""}">
+        <div class="rail" aria-hidden="true"><div class="dot">${st === "done" ? icon("check", 13, "currentColor", 3) : ""}</div>${i < steps.length - 1 ? '<div class="line"></div>' : ""}</div>
+        <div class="flex-1 between" style="align-items:flex-start;padding-top:1px"><span style="font-size:15px;font-weight:${st === "live" ? 600 : 500};color:${st === "todo" ? C.sub : C.ink}"><span class="sr-only">${({ done: "Done: ", live: "In progress: ", todo: "Next: " })[st]}</span>${t}</span>
+        <span style="font-size:13px;color:${st === "live" ? "var(--cut-ink)" : C.sub};font-weight:${st === "live" ? 600 : 400}">${s}</span></div>
+      </div>`).join("") + "</div>";
 
     const ticks = Array.from({ length: 38 }, (_, i) => `<div style="width:2px;height:${i % 5 ? 8 : 14}px;background:rgba(255,255,255,${i % 5 ? 0.25 : 0.5})"></div>`).join("");
     const total = o.dueAt - o.placedAt;
@@ -226,8 +226,23 @@ BMT.screens = BMT.screens || {};
           ${n.sub ? `<div style="font-size:14px;color:rgba(255,255,255,.6);margin-top:2px;line-height:19px">${esc(n.sub)}</div>` : ""}</div>
       </button>`;
 
+    // Pass/fail is shown by icon shape and words, not colour alone (colour-blind safe).
     const checklistHTML = (r) => r.checklist.map((c) => `
-      <div class="check-row">${icon(c.met ? "check" : "x", 16, c.met ? C.safe : C.cut, 2.6)}<span>${esc(c.item)}</span></div>`).join("");
+      <div class="check-row">${icon(c.met ? "check" : "x", 16, c.met ? C.safe : C.cut, 2.6)}<span><span class="sr-only">${c.met ? "Met: " : "Not met: "}</span>${esc(c.item)}</span></div>`).join("");
+    const A11Y_LABELS = { captions: "Captions on all speech", caption_readability: "Captions easy to read", text_contrast: "On-screen text readable", flashing: "No risky flashing", audio_clarity: "Voice clear over music" };
+    const a11yHTML = (r) => {
+      const checks = r.accessibility || [];
+      if (!checks.length) return "";
+      const failed = checks.filter((c) => !c.passed).length;
+      return `<div class="a11y-review" role="group" aria-label="Accessibility check">
+        <div class="row gap-8" style="justify-content:space-between"><span style="font-size:14px;font-weight:600">Accessibility check</span>
+          <span class="a11y-badge ${failed ? "fail" : "pass"}">${icon(failed ? "x" : "check", 12, "currentColor", 2.8)}${failed ? `${failed} to fix` : "All passed"}</span></div>
+        ${checks.map((c) => `<button class="check-row a11y-row" ${c.timestamp_sec != null ? `data-t="${c.timestamp_sec}"` : "disabled"}>
+          ${icon(c.passed ? "check" : "x", 16, c.passed ? C.safe : C.cut, 2.6)}
+          <span class="flex-1" style="text-align:left"><span class="sr-only">${c.passed ? "Passed: " : "Needs fixing: "}</span>${esc(A11Y_LABELS[c.check] || c.check)}
+            <span class="a11y-detail">${esc(c.detail)}${c.timestamp_sec != null ? ` · ${ts(c.timestamp_sec)}` : ""}</span></span></button>`).join("")}
+        <div style="font-size:12px;color:rgba(255,255,255,.55);margin-top:6px">For viewers who are deaf, low-vision or light-sensitive.</div></div>`;
+    };
 
     return {
       dark: true,
@@ -301,12 +316,14 @@ BMT.screens = BMT.screens || {};
           ai.innerHTML = `<div class="row gap-12" style="align-items:flex-end"><div class="score">${review.overall_match}%</div><div style="font-size:14px;color:rgba(255,255,255,.65);padding-bottom:6px">match with ${o.brief ? "your brief" : "your order"}</div></div>
             <div style="font-size:15px;line-height:20px;margin-top:6px">${esc(review.summary)}</div>
             <div style="margin-top:10px">${checklistHTML(review)}</div>
+            ${a11yHTML(review)}
             <div class="row gap-4" style="font-size:12px;color:rgba(255,255,255,.5);margin-top:10px">${icon("sparkle", 12, C.cut, 2)} Reviewed by Gemini</div>
             ${canAct ? `<div style="font-size:14px;font-weight:600;margin-top:16px">Tell the editor what you want, in your own words</div>
             <textarea id="fb" maxlength="1000" placeholder="e.g. make it more cinematic"></textarea>
             <div id="fb-status" style="font-size:14px;margin-top:8px"></div>
             <button class="btn secondary sm" id="fb-go" style="margin-top:8px">Turn into notes</button>
             ${api.features().screening ? `<div class="row gap-4" style="font-size:12px;color:rgba(255,255,255,.5);margin-top:8px">${icon("shield", 12, C.safe, 2)} Feedback is checked by Gemma first</div>` : ""}` : ""}`;
+          ai.querySelectorAll(".a11y-row[data-t]").forEach((b) => b.addEventListener("click", () => { seek(+b.dataset.t); toast("Jumped to " + ts(pos)); }));
           const go = ai.querySelector("#fb-go");
           go && go.addEventListener("click", () => {
             const text = ai.querySelector("#fb").value.trim();
