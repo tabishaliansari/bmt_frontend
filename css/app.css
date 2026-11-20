@@ -385,3 +385,11 @@ body.L-desk .review-b { max-height: calc(100vh - 160px); overflow-y: auto; }
 .paid-badge { width: 72px; height: 72px; border-radius: 50%; background: var(--safe-tint); display: flex; align-items: center; justify-content: center; margin: 0 auto; }
 .receipt-lines { margin-top: 8px; font-size: 13px; line-height: 19px; }
 .receipt-lines .between { gap: 12px; }
+
+/* ---------- First-run intro wizard ---------- */
+.intro-art { margin-top: 22px; height: 220px; border-radius: var(--r-xl); display: flex; align-items: center; justify-content: center; }
+.intro-icon { width: 76px; height: 76px; border-radius: 50%; background: rgba(255,255,255,.18); display: flex; align-items: center; justify-content: center; }
+.intro-dots { display: flex; gap: 6px; margin-top: 18px; }
+.intro-dots span { width: 7px; height: 7px; border-radius: 4px; background: var(--line); transition: width .2s, background .2s; }
+.intro-dots span.on { width: 22px; background: var(--cut); }
+body.L-desk .intro-art { height: 260px; }

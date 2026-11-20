@@ -121,7 +121,7 @@ window.BMT = window.BMT || {};
       ${mode === "client"
         ? `<div class="sb-me">${(() => { const me = BMT.api.currentUser(); return me ? `${av(esc(me.initials), 1, 36)}<div class="flex-1" style="min-width:0"><div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(me.name)}</div><div class="cap">Client</div></div>` : BMT.api.needsSignIn() ? `${av("?", 1, 36)}<div class="flex-1"><a href="#/you" style="font-size:15px;font-weight:600;color:inherit;text-decoration:none">Sign in</a><div class="cap">Client</div></div>` : `${av("TA", 1, 36)}<div class="flex-1"><div style="font-size:15px;font-weight:600">Tabish A.</div><div class="cap">Client</div></div>`; })()}</div>
            <button class="sb-switch" data-mode="editor">${icon("swap", 16, C.sub, 2)}Switch to editor</button>`
-        : `<div class="sb-me">${av("RK", 0, 36)}<div class="flex-1"><div class="row gap-4" style="font-size:15px;font-weight:600">Riya Kapoor${seal(14)}</div><div class="cap">Editor</div></div></div>
+        : `<div class="sb-me">${(() => { const me = BMT.api.currentUser(); return me ? `${av(esc(me.initials), 0, 36)}<div class="flex-1" style="min-width:0"><div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(me.name)}</div><div class="cap">Editor</div></div>` : `${av("RK", 0, 36)}<div class="flex-1"><div class="row gap-4" style="font-size:15px;font-weight:600">Riya Kapoor${seal(14)}</div><div class="cap">Editor</div></div>`; })()}</div>
            <button class="sb-switch" data-mode="client">${icon("swap", 16, C.sub, 2)}Switch to client</button>`}
     </div>`;
 

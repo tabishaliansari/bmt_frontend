@@ -270,7 +270,7 @@ BMT.screens = BMT.screens || {};
               <div class="row gap-10" style="margin-top:16px">${[["auto", "Automatic"], ["light", "Light"], ["dark", "Dark"]].map(([k, l]) => `<button class="choice ${BMT.theme.get() === k ? "on" : ""}" data-close data-t="${k}" style="text-align:center"><span style="font-size:15px;font-weight:600">${l}</span></button>`).join("")}</div>`,
             onMount(el) { el.querySelectorAll("[data-t]").forEach((x) => x.addEventListener("click", () => { BMT.theme.set(x.dataset.t); BMT.router.refresh(); })); },
           });
-          else if (a === "switch") { api.setMode("client"); location.hash = "#/discover"; }
+          else if (a === "switch") S.enterRole("client");
           else if (a === "reset") { api.resetDemo(); BMT.cart = null; location.hash = "#/"; }
         }));
       },

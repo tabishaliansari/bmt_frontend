@@ -3,8 +3,14 @@ window.BMT = window.BMT || {};
 
 (function () {
   const S = BMT.screens;
+  // Live app: the editor area is the real (honest) editor home, and "me" is the account screen.
+  // Mock mode (?mocks=1) keeps the original prototype Studio and editor profile.
+  const live = () => !BMT.api.BMT_USE_MOCKS;
+  const studio = (m, q) => (live() ? S.editorHome : S.studio)(m, q);
+  const editorMe = (m, q) => (live() ? S.you : S.me)(m, q);
   const routes = [
-    [/^\/?$/, (m, q) => (BMT.api.getMode() === "editor" ? S.studio : BMT.api.getMode() === "client" ? S.discover : S.welcome)(m, q)],
+    [/^\/?$/, (m, q) => (BMT.api.getMode() === "editor" ? studio : BMT.api.getMode() === "client" ? S.discover : S.welcome)(m, q)],
+    [/^\/intro\/(client|editor)$/, S.intro],
     [/^\/welcome$/, S.welcome],
     [/^\/discover$/, S.discover],
     [/^\/search$/, S.search],
@@ -18,15 +24,15 @@ window.BMT = window.BMT || {};
     [/^\/inbox$/, S.inbox],
     [/^\/you$/, S.you],
     [/^\/favs$/, S.favs],
-    [/^\/studio$/, S.studio],
-    [/^\/studio-orders$/, S.studioOrders],
+    [/^\/studio$/, studio],
+    [/^\/studio-orders$/, (m, q) => (live() ? S.editorHome : S.studioOrders)(m, q)],
     [/^\/add-credit$/, S.addCredit],
     [/^\/learn$/, S.learn],
     [/^\/community$/, S.community],
-    [/^\/me$/, S.me],
+    [/^\/me$/, editorMe],
   ];
 
-  const PRIVATE_ROUTES = /^\/(start|brief|orders|order|review)\b/;
+  const PRIVATE_ROUTES = /^\/(start|brief|orders|order|review|studio|studio-orders|me)\b/;
   const host = document.getElementById("screen");
   const side = document.getElementById("sidebar");
   let cleanup = null, stack = [];
@@ -35,6 +41,7 @@ window.BMT = window.BMT || {};
   const EDITOR_ROUTES = /^\/(studio|studio-orders|add-credit|learn|community|me)\b/;
   function navState(path) {
     if (/^\/(welcome)?$/.test(path) && !BMT.api.getMode()) return null; // welcome: no nav
+    if (/^\/intro\//.test(path)) return null; // intro wizard: full screen
     const mode = EDITOR_ROUTES.test(path) ? "editor" : (BMT.api.getMode() || "client");
     const map = mode === "client"
       ? [[/^\/(discover|editor|start|brief)/, "home"], [/^\/search/, "search"], [/^\/(orders|order|review)/, "orders"], [/^\/inbox/, "chat"], [/^\/(you|favs)/, "user"]]
@@ -47,10 +54,7 @@ window.BMT = window.BMT || {};
     document.body.classList.toggle("no-nav", !st);
     if (!st) { side.innerHTML = ""; return; }
     side.innerHTML = BMT.ui.sidebar(st.mode, st.active);
-    side.querySelector(".sb-switch").addEventListener("click", (e) => {
-      const m = e.currentTarget.dataset.mode; BMT.api.setMode(m);
-      location.hash = m === "editor" ? "#/studio" : "#/discover";
-    });
+    side.querySelector(".sb-switch").addEventListener("click", (e) => S.enterRole(e.currentTarget.dataset.mode));
   }
 
   let renderSeq = 0;
@@ -95,7 +99,7 @@ window.BMT = window.BMT || {};
 
   function back() {
     if (stack.length > 1) history.back();
-    else location.hash = BMT.api.getMode() === "editor" ? "#/studio" : "#/discover";
+    else location.hash = S.homeFor(BMT.api.getMode() || "client");
   }
 
   window.addEventListener("hashchange", () => {

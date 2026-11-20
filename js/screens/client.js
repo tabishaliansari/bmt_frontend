@@ -25,10 +25,14 @@ BMT.screens = BMT.screens || {};
       <div class="w-cta" style="position:absolute;left:24px;right:24px;bottom:calc(40px + var(--safe-bottom));display:flex;flex-direction:column;gap:10px">
         <button class="btn primary" data-go="client">I need a video edited</button>
         <button class="btn secondary" data-go="editor">I'm an editor</button>
-        <div class="sub" style="text-align:center;margin-top:6px">Have an account? <button style="color:var(--ink);font-weight:600" data-go="client">Sign in</button></div>
+        <div class="sub" style="text-align:center;margin-top:6px">Have an account? <button style="color:var(--ink);font-weight:600" data-go="client" data-returning="1">Sign in</button></div>
       </div>`,
       mount(root) {
         root.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => {
+          if (api.signInRequired()) {
+            b.dataset.returning ? S.signInReturning() : S.enterRole(b.dataset.go);
+            return;
+          }
           const m = b.dataset.go; api.setMode(m);
           location.hash = m === "editor" ? "#/studio" : "#/discover";
         }));
@@ -454,16 +458,16 @@ BMT.screens = BMT.screens || {};
     return `<div class="card-gray row gap-12" style="margin-top:12px">${av("TA", 1, 56)}<div class="flex-1"><div class="h3">Tabish A.</div><div class="foot">Client · Pune</div></div></div>`;
   };
 
-  S.you = async () => ({
-    tabs: tabbar("client", "user"),
+  S.you = async () => { const role = api.getMode() === "editor" ? "editor" : "client"; return {
+    tabs: tabbar(role, "user"),
     html: `<div class="scroll"><h1 class="large-title" style="margin-top:6px">You</h1>
       ${accountCard()}
       <div style="margin-top:20px">
-        ${[["heart", "Favourite editors", "#/favs"], ["orders", "Order history", "#/orders"], ["shield", "How payments are protected", "escrow"], ["studio", BMT.layout.isDesktop() ? "View mobile version" : "View desktop version", "layout"], ["sparkle", "Appearance · " + ({ auto: "Automatic", light: "Light", dark: "Dark" })[BMT.theme.get()], "theme"], ["swap", "Switch to editor mode", "switch"], ["repeat", "Reset demo data", "reset"]].map(([ic, t, act]) => `
+        ${[...(role === "client" ? [["heart", "Favourite editors", "#/favs"], ["orders", "Order history", "#/orders"]] : []), ["shield", "How payments are protected", "escrow"], ["play", "Replay the intro", "intro"], ["studio", BMT.layout.isDesktop() ? "View mobile version" : "View desktop version", "layout"], ["sparkle", "Appearance · " + ({ auto: "Automatic", light: "Light", dark: "Dark" })[BMT.theme.get()], "theme"], ["swap", role === "editor" ? "Switch to client mode" : "Switch to editor mode", "switch"], ["repeat", "Reset demo data", "reset"]].map(([ic, t, act]) => `
           <button class="list-row" style="width:100%;text-align:left" data-act="${act}"><div class="icon-tile" style="background:var(--grouped)">${icon(ic, 18, C.ink2)}</div><span class="flex-1" style="font-size:17px">${t}</span>${icon("chev_r", 16, C.ter, 2.2)}</button>`).join("")}
       </div></div>`,
     mount(root) {
-      root.querySelector("#signout")?.addEventListener("click", async () => { await api.signOut(); toast("Signed out"); location.hash = "#/discover"; });
+      root.querySelector("#signout")?.addEventListener("click", async () => { await api.signOut(); toast("Signed out"); location.hash = "#/"; BMT.router.refresh(); });
       root.querySelector("#signin")?.addEventListener("click", () => {
         api.signIn().then(() => BMT.router.refresh()).catch((err) => { if (err.code !== "auth/popup-closed-by-user") toast(esc(err.message)); });
       });
@@ -477,11 +481,12 @@ BMT.screens = BMT.screens || {};
               <div class="row gap-10" style="margin-top:16px">${[["auto", "Automatic"], ["light", "Light"], ["dark", "Dark"]].map(([k, l]) => `<button class="choice ${BMT.theme.get() === k ? "on" : ""}" data-close data-t="${k}" style="text-align:center"><span style="font-size:15px;font-weight:600">${l}</span></button>`).join("")}</div>`,
             onMount(el) { el.querySelectorAll("[data-t]").forEach((x) => x.addEventListener("click", () => { BMT.theme.set(x.dataset.t); BMT.router.refresh(); })); },
           });
-          else if (a === "switch") { api.setMode("editor"); location.hash = "#/studio"; }
+          else if (a === "switch") S.enterRole(role === "editor" ? "client" : "editor");
+          else if (a === "intro") location.hash = "#/intro/" + role;
         else if (a === "reset") { api.resetDemo(); BMT.cart = null; location.hash = "#/"; }
       }));
     },
-  });
+  }; };
 
   S.favs = async () => {
     const favs = api.getFavorites();

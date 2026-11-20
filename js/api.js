@@ -32,7 +32,19 @@ window.BMT = window.BMT || {};
     if (cfg.authEmulator) session.auth.useEmulator(cfg.authEmulator, { disableWarnings: true });
     await new Promise((resolve) => session.auth.onAuthStateChanged((u) => { session.user = u; resolve(); }));
   }
-  const ready = initAuth();
+
+  // The signed-in user's profile on the server: { role, editor_id, onboarded: { client, editor } }
+  const hasAccount = () => !BMT_USE_MOCKS && (session.mode === "off" || !!session.user);
+  async function loadProfile() {
+    session.profile = hasAccount() ? await http("/me").catch(() => null) : null;
+    return session.profile;
+  }
+  async function saveProfile(patch) {
+    if (!hasAccount()) return null;
+    session.profile = await http("/me", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+    return session.profile;
+  }
+  const ready = initAuth().then(loadProfile);
 
   async function authHeaders() {
     if (!session.user) return {};
@@ -326,7 +338,7 @@ window.BMT = window.BMT || {};
       if (!session.auth) return Promise.reject(new Error("Sign-in isn't available right now. Please reload the page."));
       const provider = new firebase.auth.GoogleAuthProvider();
       return session.auth.signInWithPopup(provider)
-        .then((r) => { session.user = r.user; return r.user; })
+        .then(async (r) => { session.user = r.user; await loadProfile(); return r.user; })
         .catch((err) => {
           // Popup blocked (some phones, in-app browsers): sign in by full-page redirect instead.
           if (err.code === "auth/popup-blocked" || err.code === "auth/operation-not-supported-in-this-environment") {
@@ -338,7 +350,18 @@ window.BMT = window.BMT || {};
     async signOut() {
       if (session.auth) await session.auth.signOut();
       session.user = null;
+      session.profile = null;
+      try { localStorage.removeItem("bmt:mode"); } catch {}
     },
+    /** Server profile after sign-in: { role, editor_id, onboarded } (null when signed out or in mock mode). */
+    profile: () => session.profile,
+    loadProfile,
+    /** Mark a role's intro as seen (or skipped), on the account when signed in. */
+    async markOnboarded(role) {
+      store.set("intro:" + role, true);
+      await saveProfile({ onboarded_role: role }).catch(() => null);
+    },
+    hasSeenIntro: (role) => (session.profile ? !!session.profile.onboarded?.[role] : !!store.get("intro:" + role, false)),
     currentUser() {
       const u = session.user;
       if (!u) return null;
@@ -385,9 +408,16 @@ window.BMT = window.BMT || {};
       return next.includes(id);
     },
 
-    getMode: () => store.get("mode", null),
-    setMode: (m) => store.set("mode", m),
-    resetDemo() { ["orders", "briefs", "brief", "favs", "accepting", "incomingHandled", "mode"].forEach((k) => { try { localStorage.removeItem("bmt:" + k); } catch {} }); },
+    /** "client" | "editor" | null. Signed in: the role saved on the account; otherwise this browser's choice. */
+    getMode: () => (session.mode === "firebase" ? session.profile?.role ?? null : session.profile?.role ?? store.get("mode", null)),
+    setMode(m) {
+      store.set("mode", m);
+      if (session.profile) session.profile = { ...session.profile, role: m };
+      return saveProfile({ role: m }).catch(() => null);
+    },
+    resetDemo() { ["orders", "briefs", "brief", "favs", "accepting", "incomingHandled", "mode", "intro:client", "intro:editor"].forEach((k) => { try { localStorage.removeItem("bmt:" + k); } catch {} }); },
+    /** True when sign-in is part of choosing a role (live server with Firebase Auth). */
+    signInRequired: () => session.mode === "firebase",
   };
 
   // ---------------------------------------------------------------- live backend (/api/v1)
