@@ -111,7 +111,7 @@ window.BMT = window.BMT || {};
     status: STATUS[o.status], serverStatus: o.status, revisionsLeft: o.revisions_left,
     notes: o.client_notes.map((n) => ({ t: n.t, who: "you", text: n.text })),
     briefId: o.brief_id, brief: o.brief, review: o.review, payout: o.payout, cutUploadId: o.cut_upload_id,
-    thumbnailUploadId: o.thumbnail_upload_id,
+    thumbnailUploadId: o.thumbnail_upload_id, payment: o.payment,
     deliveredAt: eventTime(o, "review"), approvedAt: eventTime(o, "approved"),
   });
 
@@ -302,6 +302,14 @@ window.BMT = window.BMT || {};
     const add = (opts.addons || []).reduce((s, id) => s + (list.find((a) => a.id === id)?.price || 0), 0);
     return item.price + add + (opts.rush ? BMT.api.RUSH_FEE : 0);
   };
+  // The same total in USD (what BMT charges). Live mode has server USD prices; mock converts.
+  const priceUsdOf = (editorId, itemId, opts = {}) => {
+    const item = findEditor(editorId).menu.find((m) => m.id === itemId);
+    const list = cache.addons || [];
+    if (item.priceUsd == null) return Math.round((priceOf(editorId, itemId, opts) / MOCK_FX) * 100) / 100;
+    const add = (opts.addons || []).reduce((s, id) => s + (list.find((a) => a.id === id)?.priceUsd || 0), 0);
+    return Math.round((item.priceUsd + add + (opts.rush ? cache.rushUsd || 0 : 0)) * 100) / 100;
+  };
 
   // ---------------------------------------------------------------- shared (same in both modes)
   const shared = {
@@ -343,6 +351,10 @@ window.BMT = window.BMT || {};
     getCategories: () => wait(categories),
     getQuickPackages: () => wait(quickPackages),
     quote: (editorId, itemId, opts) => priceOf(editorId, itemId, opts),
+    quoteUsd: (editorId, itemId, opts) => priceUsdOf(editorId, itemId, opts),
+    /** Platform fee and demo FX rate, for the checkout and payout screens (display only). */
+    PLATFORM_FEE_PCT: 15,
+    DEMO_FX: MOCK_FX,
 
     /** The brief the client is ordering for: { id, title, category, packageTitle } */
     getActiveBrief: () => store.get("brief", null),
@@ -391,6 +403,7 @@ window.BMT = window.BMT || {};
       const c = await http("/addons");
       cache.addons = c.addons.map(toAddon);
       BMT.api.RUSH_FEE = c.rush_fee_inr;
+      cache.rushUsd = c.rush_fee_usd;
       return cache.addons;
     },
 
@@ -410,8 +423,8 @@ window.BMT = window.BMT || {};
     getRecommendedEditors: async (briefId) => remember((await http(`/editors/recommended?brief_id=${enc(briefId)}`)).map(toEditor)),
 
     /** POST /orders → funds held safely until approval. The server sets the price. */
-    async placeOrder({ editorId, itemId, addons: ad = [], rush = false, note = "", briefId = null }) {
-      return toOrder(await http("/orders", json("POST", { editor_id: editorId, package_id: itemId, addons: ad, rush, note, brief_id: briefId })));
+    async placeOrder({ editorId, itemId, addons: ad = [], rush = false, note = "", briefId = null, paymentMethod = "demo_card" }) {
+      return toOrder(await http("/orders", json("POST", { editor_id: editorId, package_id: itemId, addons: ad, rush, note, brief_id: briefId, payment_method: paymentMethod })));
     },
     getOrders: async () => (await http("/orders")).map(toOrder),
     getOrder: async (id) => { const o = await orNull(http(`/orders/${enc(id)}`)); return o && toOrder(o); },
@@ -465,13 +478,16 @@ window.BMT = window.BMT || {};
       return wait(editors.filter((e) => !cat || e.categories.includes(cat)).sort((a, z) => z.rating - a.rating));
     },
 
-    async placeOrder({ editorId, itemId, addons: ad = [], rush = false, note = "", briefId = null }) {
+    async placeOrder({ editorId, itemId, addons: ad = [], rush = false, note = "", briefId = null, paymentMethod = "demo_card" }) {
       const item = findEditor(editorId).menu.find((m) => m.id === itemId);
       const orders = store.get("orders", []);
       const hours = rush ? 24 : item.eta.includes("h") ? parseInt(item.eta) : parseInt(item.eta) * 24;
+      const total = priceOf(editorId, itemId, { addons: ad, rush });
+      const totalUsd = priceUsdOf(editorId, itemId, { addons: ad, rush });
       const order = {
         id: "BMT-" + (2481 + orders.length), editorId, itemId, title: item.title, g: item.g, addons: ad, rush, note,
-        total: priceOf(editorId, itemId, { addons: ad, rush }),
+        total, totalUsd,
+        payment: { method: paymentMethod === "demo_upi" ? "Test UPI (demo@bmt)" : "Test card ending 4242", amount_usd: totalUsd, amount_inr: total, reference: "PAY-SIM-MOCK" + orders.length, status: "held", simulated: true },
         placedAt: Date.now(), dueAt: Date.now() + Math.min(hours, 14) * 3600e3,
         status: "editing", revisionsLeft: ad.includes("revision") ? 3 : 2, notes: [],
         briefId, brief: briefId ? store.get("briefs", {})[briefId]?.result || null : null,
@@ -494,8 +510,14 @@ window.BMT = window.BMT || {};
     },
     async approveOrder(id) {
       const o = await mock.getOrder(id);
-      const usd = Math.round((o.total / MOCK_FX) * (1 - MOCK_FEE) * 100) / 100;
-      const payout = { amount_usd: usd, fx_rate: MOCK_FX, amount_inr: Math.round(usd * MOCK_FX * 100) / 100, rail: "ramp", status: "simulated" };
+      const gross = o.totalUsd ?? Math.round((o.total / MOCK_FX) * 100) / 100;
+      const fee = Math.round(gross * MOCK_FEE * 100) / 100;
+      const usd = Math.round((gross - fee) * 100) / 100;
+      const payout = {
+        amount_usd: usd, fx_rate: MOCK_FX, amount_inr: Math.round(usd * MOCK_FX * 100) / 100,
+        gross_usd: gross, fee_usd: fee, fee_pct: MOCK_FEE * 100, transfer_id: "RAMP-SIM-MOCK", eta: "About 1 business day",
+        rail: "ramp", status: "simulated",
+      };
       return patchOrder(id, { status: "approved", approvedAt: Date.now(), payout });
     },
     async runReview(id, feedback) {

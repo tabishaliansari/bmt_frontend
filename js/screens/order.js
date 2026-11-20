@@ -34,7 +34,13 @@ BMT.screens = BMT.screens || {};
       ${icon("check", 22, C.safe, 2.6)}
       <div class="flex-1"><div class="big">Paid to ${esc(first(e))}: ${inr2(p.amount_inr)}</div>
         <div style="font-size:13px;margin-top:2px">${usd(p.amount_usd)} at ${Number(p.fx_rate).toFixed(2)} · via Ramp · simulated</div>
-        <div style="font-size:12px;opacity:.8;margin-top:4px">Demo FX rate and payout. No real money moved.</div></div>
+        ${p.gross_usd ? `<div class="receipt-lines">
+          <div class="between"><span>You paid</span><span>${usd(p.gross_usd)}</span></div>
+          <div class="between"><span>BMT fee (${p.fee_pct}%)</span><span>− ${usd(p.fee_usd)}</span></div>
+          <div class="between"><span>${esc(first(e))} receives</span><span><b>${inr2(p.amount_inr)}</b></span></div>
+          ${p.transfer_id ? `<div class="between"><span>Ramp transfer</span><span>${esc(p.transfer_id)}</span></div>` : ""}
+        </div>` : ""}
+        <div style="font-size:12px;opacity:.8;margin-top:6px">Demo FX rate and payout. No real money moved.</div></div>
     </div>`;
 
   S.order = async ([id]) => {
@@ -102,7 +108,7 @@ BMT.screens = BMT.screens || {};
         ${o.status === "approved" && o.payout ? receipt(e, o.payout) : `
         <button id="held" style="width:100%;text-align:left;margin-top:22px;border-radius:16px;border:1px solid var(--line);padding:14px;display:flex;gap:12px;align-items:center">
           <div class="icon-tile" style="width:40px;height:40px;border-radius:12px;background:var(--safe-tint)">${icon(o.status === "approved" ? "check" : "lock", 20, C.safe, 2)}</div>
-          <div class="flex-1"><div class="h3" style="font-size:15px">${inr(o.total)} ${o.status === "approved" ? "released" : "held safely"}</div><div class="foot">${o.status === "approved" ? "Paid to " + first(e) + ". Leave a review?" : "Released to " + first(e) + " only when you approve the final cut."}</div></div>
+          <div class="flex-1"><div class="h3" style="font-size:15px">${inr(o.total)} ${o.status === "approved" ? "released" : "held safely"}</div><div class="foot">${o.status === "approved" ? "Paid to " + first(e) + ". Leave a review?" : "Released to " + first(e) + " only when you approve the final cut."}</div>${o.payment ? `<div class="cap" style="margin-top:2px">${esc(o.payment.method)} · ${esc(o.payment.reference)} · simulated</div>` : ""}</div>
           ${icon("chev_r", 16, C.ter, 2.2)}
         </button>`}
         ${o.status === "editing" ? `
@@ -400,13 +406,14 @@ BMT.screens = BMT.screens || {};
             <button class="btn secondary" data-close style="margin-top:10px">Not yet</button></div>`,
           onMount(el, close) {
             el.querySelector("#confirm").addEventListener("click", async (ev) => {
-              ev.currentTarget.disabled = true;
+              const btn = ev.currentTarget;
+              btn.disabled = true; btn.textContent = "Releasing…";
               try {
-                await api.approveOrder(o.id); close();
-                toast("Approved. Payment released", icon("check", 16, C.safe, 2.6));
-                location.hash = "#/order/" + o.id;
+                const approved = await api.approveOrder(o.id);
+                close();
+                S.payoutSheet({ editor: e, order: approved });
               } catch (err) {
-                ev.currentTarget.disabled = false;
+                btn.disabled = false; btn.textContent = "Approve and release";
                 toast(esc(err.message));
               }
             });

@@ -363,7 +363,7 @@ BMT.screens = BMT.screens || {};
           <div style="font-size:13px;line-height:18px;color:var(--safe-ink)"><b style="font-weight:600">BMT Protected.</b> <span id="protect-amt">${totalHTML()}</span> stays with us until you approve the final cut. Missed deadline? Instant refund.</div>
         </button>`,
       foot: `<div><div class="foot">Total</div><div id="total" style="font-size:22px;font-weight:700;letter-spacing:-0.4px">${totalHTML()}</div></div>
-             <button class="btn primary" id="place" style="flex:1;height:52px">Place order</button>`,
+             <button class="btn primary" id="place" style="flex:1;height:52px">Continue to payment</button>`,
       onMount(el, close) {
         const refresh = () => {
           el.querySelector("#total").textContent = totalHTML();
@@ -390,23 +390,13 @@ BMT.screens = BMT.screens || {};
           el.querySelector("#file-label").innerHTML = `<div style="font-size:15px;font-weight:600">${list[0].name}${list.length > 1 ? ` <span style="font-weight:400;color:var(--sub)">+ ${list.length - 1} more</span>` : ""}</div><div class="cap">${gb} GB · uploading in background</div>`;
         });
         el.querySelector("#protect").addEventListener("click", escrowSheet);
-        el.querySelector("#place").addEventListener("click", async (ev) => {
-          const btn = ev.currentTarget;
+        el.querySelector("#place").addEventListener("click", async () => {
           if (api.needsSignIn()) {
             try { await api.signIn(); } catch (err) { if (err.code !== "auth/popup-closed-by-user") toast(esc(err.message)); return; }
           }
-          btn.disabled = true; btn.textContent = "Placing order…";
-          try {
-            const order = await api.placeOrder({ editorId: e.id, itemId, addons: cart.addons, rush: cart.rush, note: el.querySelector("#note").value, briefId: brief?.id || null });
-            BMT.cart = null;
-            if (brief) api.clearActiveBrief();
-            close();
-            toast("Order placed · money held safely", icon("lock", 16, C.safe, 2));
-            location.hash = "#/order/" + order.id;
-          } catch (err) {
-            btn.disabled = false; btn.textContent = "Place order";
-            toast(esc(err.message));
-          }
+          const order = { editorId: e.id, itemId, addons: [...cart.addons], rush: cart.rush, note: el.querySelector("#note").value, briefId: brief?.id || null };
+          close();
+          S.checkoutSheet({ editor: e, item, order, brief });
         });
       },
     });
