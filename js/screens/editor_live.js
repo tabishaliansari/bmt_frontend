@@ -73,7 +73,7 @@ BMT.screens = BMT.screens || {};
       ${ui.referencesSec(b.references, links, refClipCount, "The client's references")}
       <div class="sec"><div class="label">Must include</div><ul>${b.must_include.map((t) => `<li>${icon("check", 16, C.safe, 2.2)}<span>${esc(t)}</span></li>`).join("")}</ul></div>
       ${b.questions_for_client.length ? `<div class="sec"><div class="label">Open questions for the client</div><ul>${b.questions_for_client.map((t) => `<li>${icon("chat", 16, C.sub, 2.2)}<span>${esc(t)}</span></li>`).join("")}</ul></div>` : ""}
-      <div class="ai-label">${icon("sparkle", 14, C.cut)} Brief written by Gemini from the client's footage</div>
+      <div style="margin-top:14px">${ui.aiBadges(["gemini", "wrote this brief from the client's footage"])}</div>
     </div>`;
 
   const notesHTML = (o) => {
@@ -154,7 +154,7 @@ BMT.screens = BMT.screens || {};
             <div class="job-clip"><video src="${esc(m.url)}" controls playsinline preload="metadata"></video>
               <div class="between" style="margin-top:6px"><span class="cap">${esc(m.label)} · ${esc(m.filename)}</span><a class="link" href="${esc(m.url)}" download="${esc(m.filename)}" style="font-size:13px">Download</a></div></div>`).join("")}
             ${thumbItem ? `<div class="job-clip"><img src="${esc(thumbItem.url)}" alt="Thumbnail concept" style="width:100%;border-radius:12px;display:block">
-              <div class="cap" style="margin-top:6px">Thumbnail concept · drafted by Nano Banana</div></div>` : ""}
+              <div class="cap" style="margin-top:6px">Thumbnail concept</div>${ui.aiBadges(["nano", "generated from the brief"])}</div>` : ""}
           </div>` : ""}
       </div>`,
       mount(root) {

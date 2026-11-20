@@ -4,7 +4,7 @@ BMT.screens = BMT.screens || {};
 
 (function () {
   const { api, ui } = BMT;
-  const { C, icon, seal, av, inr, usd, esc, tabbar, toast, sheet, aiProgress } = ui;
+  const { C, icon, seal, av, inr, usd, esc, tabbar, toast, sheet, aiProgress, aiBadge, aiBadges } = ui;
   const S = BMT.screens;
 
   const fmtLeft = (ms) => {
@@ -16,10 +16,30 @@ BMT.screens = BMT.screens || {};
   const inr2 = (n) => "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const first = (e) => e.name.split(" ")[0];
 
+  // "Google AI on this order": every model that worked on it, and what's still to come.
+  function aiTrail(o, brief) {
+    const refs = o.brief?.references?.length || 0;
+    const fromFeedback = (o.review?.notes || []).some((n) => n.source === "client");
+    const rows = [
+      brief?.screened_by && ["gemma", "Checked your note for anything unsafe", true],
+      o.brief && ["gemini", "Watched your clips and wrote the brief", true],
+      refs && ["gemini", `Studied ${refs} reference${refs === 1 ? "" : "s"} you shared`, true],
+      o.thumbnailUploadId && ["nano", "Generated the thumbnail concept", true],
+      ["gemini", o.review ? `Reviewed the cut: ${o.review.overall_match}% match with your brief` : "Will review the cut against your brief", !!o.review],
+      ["gemini", o.review?.accessibility?.length ? "Checked the cut for accessibility" : "Will check captions, contrast and flashing", !!o.review?.accessibility?.length],
+      fromFeedback && ["gemini", "Turned your feedback into timestamped notes", true],
+    ].filter(Boolean);
+    return `<div class="card-gray ai-trail" style="margin-top:14px" role="list" aria-label="Google AI on this order">
+      <div class="h3" style="font-size:15px">Google AI on this order</div>
+      ${rows.map(([m, text, done]) => `<div class="ai-trail-row ${done ? "" : "todo"}" role="listitem">${aiBadge(m)}
+        <span class="flex-1"><span class="sr-only">${done ? "Done: " : "Next: "}</span>${esc(text)}</span>${done ? icon("check", 14, C.safe, 2.6) : ""}</div>`).join("")}
+    </div>`;
+  }
+
   // ---------------------------------------------------------------- 06 Tracking
   const briefCard = (b, thumbUrl) => `
     <button class="brief-card" id="brief-toggle" aria-expanded="false">
-      <div class="between"><span class="row gap-8">${icon("sparkle", 16, C.cut, 2)}<span class="h3" style="font-size:15px">Your brief</span></span><span id="brief-chev">${icon("chev_d", 16, C.sub, 2.2)}</span></div>
+      <div class="between"><span class="row gap-8"><span class="h3" style="font-size:15px">Your brief</span>${aiBadge("gemini")}</span><span id="brief-chev">${icon("chev_d", 16, C.sub, 2.2)}</span></div>
       <div class="foot" style="margin-top:2px">${esc(b.title)} · ${b.target_length_sec} sec</div>
       <div id="brief-body" hidden style="margin-top:12px">
         ${thumbUrl ? `<img src="${esc(thumbUrl)}" alt="Thumbnail concept" style="display:block;max-height:200px;border-radius:10px;margin-bottom:10px">` : ""}
@@ -48,6 +68,7 @@ BMT.screens = BMT.screens || {};
     if (!o) return S.notFound();
     const e = await api.getEditor(o.editorId);
     const thumbUrl = o.thumbnailUploadId ? await api.mediaUrl(o.thumbnailUploadId).catch(() => null) : null;
+    const brief = o.briefId ? await api.getBrief(o.briefId).catch(() => null) : null;
 
     // Live app: the editor really accepts (or declines). Mock mode keeps the prototype's timing.
     const live = !api.BMT_USE_MOCKS;
@@ -114,6 +135,7 @@ BMT.screens = BMT.screens || {};
           <button class="icon-btn" id="chat" style="background:var(--raised);width:40px;height:40px" aria-label="Message">${icon("chat", 19, C.ink, 2)}</button>
         </div>
         ${o.brief ? briefCard(o.brief, thumbUrl) : ""}
+        ${o.brief || o.review ? aiTrail(o, brief) : ""}
         </div><div class="track-b">
         <div style="margin-top:22px" class="steps">${stepHTML}</div>
         ${o.status === "approved" && o.payout ? receipt(e, o.payout) : `
@@ -235,7 +257,7 @@ BMT.screens = BMT.screens || {};
       if (!checks.length) return "";
       const failed = checks.filter((c) => !c.passed).length;
       return `<div class="a11y-review" role="group" aria-label="Accessibility check">
-        <div class="row gap-8" style="justify-content:space-between"><span style="font-size:14px;font-weight:600">Accessibility check</span>
+        <div class="row gap-8" style="justify-content:space-between"><span class="row gap-8" style="font-size:14px;font-weight:600">Accessibility check ${aiBadge("gemini")}</span>
           <span class="a11y-badge ${failed ? "fail" : "pass"}">${icon(failed ? "x" : "check", 12, "currentColor", 2.8)}${failed ? `${failed} to fix` : "All passed"}</span></div>
         ${checks.map((c) => `<button class="check-row a11y-row" ${c.timestamp_sec != null ? `data-t="${c.timestamp_sec}"` : "disabled"}>
           ${icon(c.passed ? "check" : "x", 16, c.passed ? C.safe : C.cut, 2.6)}
@@ -298,7 +320,7 @@ BMT.screens = BMT.screens || {};
         const renderAI = (state, error) => {
           if (stopProgress) { stopProgress(); stopProgress = null; }
           if (state === "running") {
-            stopProgress = aiProgress(ai, ["Watching the cut…", "Checking it against your brief…", "Writing notes…"]);
+            stopProgress = aiProgress(ai, ["Gemini is watching the cut…", "Gemini is checking it against your brief…", "Gemini is checking captions, contrast and flashing…", "Gemini is writing notes…"]);
             return;
           }
           if (state === "error") {
@@ -317,12 +339,12 @@ BMT.screens = BMT.screens || {};
             <div style="font-size:15px;line-height:20px;margin-top:6px">${esc(review.summary)}</div>
             <div style="margin-top:10px">${checklistHTML(review)}</div>
             ${a11yHTML(review)}
-            <div class="row gap-4" style="font-size:12px;color:rgba(255,255,255,.5);margin-top:10px">${icon("sparkle", 12, C.cut, 2)} Reviewed by Gemini</div>
+            <div style="margin-top:12px">${aiBadges(["gemini", "reviewed this cut against your brief"])}</div>
             ${canAct ? `<div style="font-size:14px;font-weight:600;margin-top:16px">Tell the editor what you want, in your own words</div>
             <textarea id="fb" maxlength="1000" placeholder="e.g. make it more cinematic"></textarea>
             <div id="fb-status" style="font-size:14px;margin-top:8px"></div>
             <button class="btn secondary sm" id="fb-go" style="margin-top:8px">Turn into notes</button>
-            ${api.features().screening ? `<div class="row gap-4" style="font-size:12px;color:rgba(255,255,255,.5);margin-top:8px">${icon("shield", 12, C.safe, 2)} Feedback is checked by Gemma first</div>` : ""}` : ""}`;
+            <div style="margin-top:8px">${aiBadges(api.features().screening && ["gemma", "checks it first"], ["gemini", "turns it into notes"])}</div>` : ""}`;
           ai.querySelectorAll(".a11y-row[data-t]").forEach((b) => b.addEventListener("click", () => { seek(+b.dataset.t); toast("Jumped to " + ts(pos)); }));
           const go = ai.querySelector("#fb-go");
           go && go.addEventListener("click", () => {
@@ -336,7 +358,7 @@ BMT.screens = BMT.screens || {};
           if (feedback) {
             const status = ai.querySelector("#fb-status");
             ai.querySelector("#fb-go").disabled = true;
-            stopProgress = aiProgress(status, ["Reading your feedback…", "Finding the right moments…"]);
+            stopProgress = aiProgress(status, [...(api.features().screening ? ["Gemma is checking your feedback…"] : []), "Gemini is finding the right moments…"]);
           } else {
             renderAI("running");
           }

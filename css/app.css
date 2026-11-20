@@ -460,3 +460,20 @@ body.A-motion *, body.A-motion *::before, body.A-motion *::after { animation-dur
 .ref-insight:last-child { border-bottom: 0; }
 .ref-insight .src { font-size: 13px; font-weight: 700; color: var(--cut-ink); }
 .ref-insight .lnk { color: var(--trust-ink); font-size: 13px; word-break: break-all; }
+
+/* ---------- AI badges: which Google model did this ---------- */
+.ai-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.ai-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 7px; border-radius: 999px;
+  font-size: 12px; line-height: 16px; font-weight: 500; white-space: nowrap; }
+.ai-badge b { font-weight: 700; }
+.ai-badge span { opacity: .9; white-space: normal; }
+.ai-gemini { background: #EEF3FE; color: #1A56C4; }
+.ai-gemma  { background: #E7F6EE; color: #16683F; }
+.ai-nano   { background: #FFF4D6; color: #7A4F00; }
+body.T-dark .ai-gemini, .screen.dark .ai-gemini, .card-ink .ai-gemini { background: rgba(110,160,255,.18); color: #A9C7FF; }
+body.T-dark .ai-gemma,  .screen.dark .ai-gemma,  .card-ink .ai-gemma  { background: rgba(48,196,107,.18); color: #7BE0A6; }
+body.T-dark .ai-nano,   .screen.dark .ai-nano,   .card-ink .ai-nano   { background: rgba(255,200,60,.18); color: #FFD771; }
+.ai-trail-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; font-size: 14px; line-height: 19px; border-bottom: 1px solid var(--line); }
+.ai-trail-row:last-child { border-bottom: 0; }
+.ai-trail-row .ai-badge { min-width: 104px; justify-content: center; }
+.ai-trail-row.todo { color: var(--sub); }

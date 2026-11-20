@@ -4,7 +4,7 @@ BMT.screens = BMT.screens || {};
 
 (function () {
   const { api, ui } = BMT;
-  const { C, icon, chip, esc, toast, aiProgress } = ui;
+  const { C, icon, chip, esc, toast, aiProgress, aiBadges } = ui;
   const S = BMT.screens;
 
   const MAX_CLIPS = 3;
@@ -65,7 +65,7 @@ BMT.screens = BMT.screens || {};
 
         <div id="status"></div>
         <button class="btn primary" id="go" style="margin-top:16px" disabled>Write my brief</button>
-        <div class="ai-label" style="justify-content:center">${icon("sparkle", 14, C.cut)} Written by Gemini · you can edit it before ordering</div>
+        <div style="margin-top:12px;display:flex;justify-content:center">${aiBadges(api.features().screening && ["gemma", "checks your note"], ["gemini", "watches the clips, writes the brief"])}</div>
       </div>`,
       mount(root) {
         const list = root.querySelector("#clips"), go = root.querySelector("#go"), status = root.querySelector("#status");
@@ -152,7 +152,12 @@ BMT.screens = BMT.screens || {};
           go.textContent = "Writing your brief…";
           status.innerHTML = `<div class="card-ink" style="margin-top:16px" id="wait"></div>`;
           const hasRefs = links.length || ready(refClips).length;
-          stopProgress = aiProgress(status.querySelector("#wait"), ["Watching your clips…", ...(hasRefs ? ["Studying your references…"] : []), "Finding the best moments…", "Writing the brief…"]);
+          stopProgress = aiProgress(status.querySelector("#wait"), [
+            ...(api.features().screening ? ["Gemma is checking your note…"] : []),
+            "Gemini is watching your clips…",
+            ...(hasRefs ? ["Gemini is studying your references…"] : []),
+            "Gemini is finding the best moments…", "Gemini is writing the brief…",
+          ]);
           try {
             const brief = await api.createBrief({
               uploadIds: ready(clips).map((c) => c.upload.id), note: root.querySelector("#note").value.trim(),
@@ -208,8 +213,8 @@ BMT.screens = BMT.screens || {};
           ${r.questions_for_client.length ? `<div class="sec"><div class="label">Questions for you</div><ul>${listItems(r.questions_for_client, "questions_for_client", "chat")}</ul></div>` : ""}
           <div class="sec card-gray"><div class="label">Recommended package</div>
             <div class="h3">${esc(r.recommended_package.package_title)}</div><div class="foot" style="margin-top:2px">${esc(r.recommended_package.reason)}</div></div>
-          <div class="ai-label">${icon("sparkle", 14, C.cut)} Written by Gemini · tap any text to edit it</div>
-          ${brief.screened_by ? `<div class="ai-label" style="margin-top:4px">${icon("shield", 14, C.safe, 2)} Your note was checked by Gemma</div>` : ""}
+          <div style="margin-top:16px">${aiBadges(["gemini", "watched your clips and wrote this brief"], brief.screened_by && ["gemma", "checked your note first"])}</div>
+          <div class="cap" style="margin-top:6px">Tap any text to edit it.</div>
         </article>
         ${api.features().thumbnail ? `<section class="brief-doc" id="thumb-box">
           <div class="label" style="font-size:12px;font-weight:600;color:var(--sub);text-transform:uppercase;letter-spacing:.4px">Thumbnail concept</div>
@@ -224,7 +229,8 @@ BMT.screens = BMT.screens || {};
         const showThumb = async (uploadId) => {
           const url = await api.mediaUrl(uploadId);
           thumbBody.innerHTML = `<img src="${esc(url)}" alt="Thumbnail concept for ${esc(r.title)}" style="display:block;max-width:100%;max-height:420px;border-radius:14px;margin:0 auto">
-            <div class="ai-label" style="justify-content:center">${icon("sparkle", 14, C.cut)} Drafted by Nano Banana · the editor will refine it</div>
+            <div style="margin-top:10px;display:flex;justify-content:center">${aiBadges(["nano", "generated this thumbnail"])}</div>
+            <div class="cap" style="text-align:center;margin-top:4px">A starting idea; the editor will refine it.</div>
             <button class="btn secondary sm" id="thumb-go" style="margin-top:10px">Draft another</button>`;
           thumbBody.querySelector("#thumb-go").addEventListener("click", draft);
         };
@@ -234,7 +240,7 @@ BMT.screens = BMT.screens || {};
           thumbBody.querySelector("#thumb-go").addEventListener("click", draft);
         };
         async function draft() {
-          stopThumb = aiProgress(thumbBody, ["Reading your brief…", "Sketching the thumbnail…"]);
+          stopThumb = aiProgress(thumbBody, ["Nano Banana is reading your brief…", "Nano Banana is drawing the thumbnail…"]);
           try {
             const updated = await api.draftThumbnail(brief.id);
             stopThumb();
@@ -289,8 +295,9 @@ BMT.screens = BMT.screens || {};
       html: `<div class="scroll">
         ${backRow("Editors for your brief")}
         <div class="card-gray" style="margin-top:14px">
-          <div class="row gap-8">${icon("sparkle", 16, C.cut)}<span class="h3" style="font-size:15px">${esc(brief.result.title)}</span></div>
+          <div class="h3" style="font-size:15px">${esc(brief.result.title)}</div>
           <div class="foot" style="margin-top:4px">Looking for: ${esc(rec.package_title)}. ${esc(rec.reason)}</div>
+          <div style="margin-top:8px">${aiBadges(["gemini", "picked the package type from your footage"])}</div>
         </div>
         <div class="section-head"><h2 class="h2">Best matches</h2><span class="cap">Featured, then best rated</span></div>
         <div class="ed-grid">${editors.length ? editors.map(S.editorCard).join("") : `<div class="empty">No editors in this category yet.<br><a class="link" href="#/discover">Browse all editors</a></div>`}</div>

@@ -202,6 +202,20 @@ window.BMT = window.BMT || {};
       <svg width="27" height="13" viewBox="0 0 27 13"><rect x="0.5" y="0.5" width="23" height="12" rx="3.5" stroke="currentColor" stroke-opacity=".4" fill="none"/><rect x="2" y="2" width="19" height="9" rx="2" fill="currentColor"/><rect x="24.5" y="4.5" width="1.6" height="4" rx=".8" fill="currentColor" fill-opacity=".45"/></svg>
     </div></div>`;
 
+  // ---------------------------------------------------------------- AI badges
+  // Every AI step names the Google model that did it: "✦ Gemini · wrote this brief".
+  const AI_MODELS = {
+    gemini: { name: "Gemini", ic: "sparkle" },
+    gemma: { name: "Gemma", ic: "shield" },
+    nano: { name: "Nano Banana", ic: "image" },
+  };
+  const aiBadge = (model, action = "") => {
+    const m = AI_MODELS[model];
+    return `<span class="ai-badge ai-${model}">${icon(m.ic, 13, "currentColor", 2.2)}<b>${m.name}</b>${action ? `<span>· ${action}</span>` : ""}</span>`;
+  };
+  /** A row of badges: aiBadges(["gemini", "wrote this brief"], ["gemma", "checked your note"]) */
+  const aiBadges = (...items) => `<div class="ai-badges">${items.filter(Boolean).map(([m, a]) => aiBadge(m, a)).join("")}</div>`;
+
   /** Gemini's notes on the client's references. Labels run clips first, then links. */
   function referencesSec(refs, links = [], clipCount = 0, heading = "Inspired by your references") {
     if (!refs || !refs.length) return "";
@@ -210,7 +224,7 @@ window.BMT = window.BMT || {};
       return n > clipCount ? links[n - clipCount - 1] : null;
     };
     const safeHref = (l) => (/^https?:\/\//i.test(l || "") ? l : null);
-    return `<div class="sec"><div class="label">${heading}</div>${refs.map((r) => {
+    return `<div class="sec"><div class="label">${heading}</div>${aiBadges(["gemini", "watched your references"])}${refs.map((r) => {
       const href = safeHref(linkFor(r.source));
       return `<div class="ref-insight"><div class="src">${esc(r.source)}${href ? "" : " · clip"}</div>
         ${href ? `<a class="lnk" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${esc(href)}</a>` : ""}
@@ -246,5 +260,5 @@ window.BMT = window.BMT || {};
   /** A loading placeholder shaped like the screen that's coming: grid | detail | list | order | doc */
   const skeleton = (kind) => `<div aria-busy="true" aria-label="Loading">${(SKELETONS[kind] || SKELETONS.list)()}</div>`;
 
-  BMT.ui = { C, G, icon, seal, yt, logo, av, thumb, playBadge, chip, rating, tagChip, inr, usd, esc, aiProgress, compact, tabbar, sidebar, toast, sheet, onLongPress, peek, statusBar, isDesktop, skeleton, referencesSec };
+  BMT.ui = { C, G, icon, seal, yt, logo, av, thumb, playBadge, chip, rating, tagChip, inr, usd, esc, aiProgress, compact, tabbar, sidebar, toast, sheet, onLongPress, peek, statusBar, isDesktop, skeleton, referencesSec, aiBadge, aiBadges };
 })();

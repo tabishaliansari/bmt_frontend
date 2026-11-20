@@ -329,7 +329,7 @@ BMT.screens = BMT.screens || {};
     const footage = brief
       ? `<div class="h3" style="margin-top:20px">Your brief</div>
         <div class="card-gray row gap-10" style="margin-top:10px">${icon("sparkle", 18, C.cut, 2)}
-          <div class="flex-1"><div style="font-size:15px;font-weight:600">${esc(brief.title)}</div><div class="cap">Written by Gemini from your clips · attached to this order</div></div>
+          <div class="flex-1"><div style="font-size:15px;font-weight:600">${esc(brief.title)}</div><div class="cap">Attached to this order</div>${BMT.ui.aiBadges(["gemini", "wrote it from your clips"])}</div>
           <a class="link" href="#/brief/${esc(brief.id)}" data-close style="font-size:15px">View</a></div>`
       : `<div class="h3" style="margin-top:20px">Your footage</div>
         <label class="dropzone" style="margin-top:10px">
